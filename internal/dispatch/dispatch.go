@@ -41,7 +41,7 @@ func PlanDispatches(s state.State, maxConcurrent int, blockedOrders map[string]s
 	}
 
 	busyIndex := s.OrderBusyIndex()
-	capacity := maxConcurrent - len(busyIndex)
+	capacity := maxConcurrent - runningOrderCount(s, busyIndex)
 	if capacity < 0 {
 		capacity = 0
 	}
@@ -261,6 +261,20 @@ func RouteFailure(s state.State, orderID string, stageIndex int, reason string) 
 	return next
 }
 
+// runningOrderCount counts the busy orders that hold a cook slot. A stage in
+// review is parked for a human with no session running, so it keeps its order
+// busy without using capacity.
+func runningOrderCount(s state.State, busyIndex map[string]int) int {
+	n := 0
+	for orderID, stageIndex := range busyIndex {
+		for _, stage := range s.Orders[orderID].Stages {
+			if stage.StageIndex == stageIndex && stage.Status != state.StageReview {
+				n++
+			}
+		}
+	}
+	return n
+}
 func sortedOrderIDs(orders map[string]state.OrderNode) []string {
 	nodes := make([]state.OrderNode, 0, len(orders))
 	for _, order := range orders {

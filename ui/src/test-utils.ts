@@ -14,6 +14,7 @@ export function buildOrder(overrides?: Partial<Order>): Order {
     id: `order-${Math.random().toString(36).slice(2, 8)}`,
     stages: [buildStage()],
     status: "active",
+    publish_gated: false,
     ...overrides,
   };
 }
@@ -69,6 +70,7 @@ export function buildSnapshot(overrides?: Partial<Snapshot>): Snapshot {
     mode: "supervised",
     max_concurrency: 4,
     warnings: [],
+    draft_pr: false,
     ...overrides,
   };
 }

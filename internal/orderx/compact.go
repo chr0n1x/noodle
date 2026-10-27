@@ -23,6 +23,7 @@ type CompactStage struct {
 type CompactOrder struct {
 	ID        string         `json:"id"`
 	Title     string         `json:"title,omitempty"`
+	URL       string         `json:"url,omitempty"`
 	Plan      []string       `json:"plan,omitempty"`
 	Rationale string         `json:"rationale,omitempty"`
 	Stages    []CompactStage `json:"stages"`
@@ -91,6 +92,7 @@ func ExpandCompactOrders(compact CompactOrdersFile) (OrdersFile, error) {
 		orders = append(orders, Order{
 			ID:        order.ID,
 			Title:     order.Title,
+			URL:       CleanOrderURL(order.URL),
 			Plan:      order.Plan,
 			Rationale: order.Rationale,
 			Stages:    stages,

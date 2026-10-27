@@ -45,6 +45,7 @@ var schemaTargets = []targetSpec{
 			"backlog[].title":               {Description: "backlog item title"},
 			"backlog[].status":              {Description: "backlog workflow status (adapter-defined, not validated)"},
 			"backlog[].plan":                {Description: "optional path to plan overview file (e.g. brain/plans/29-context-passthrough/overview.md)"},
+			"backlog[].url":                 {Description: "optional link to the item's source (ticket, issue or pull request), as given by the adapter"},
 			"active_summary.total":          {Type: "number", Description: "total active sessions"},
 			"active_summary.by_task_key{}":  {Type: "number", Description: "active sessions grouped by task key"},
 			"active_summary.by_status{}":    {Type: "number", Description: "active sessions grouped by status"},
@@ -89,6 +90,7 @@ var schemaTargets = []targetSpec{
 		FieldDocs: map[string]FieldDoc{
 			"orders[].id":                    {Description: "order ID (plan ID as string, or unique slug)"},
 			"orders[].title":                 {Description: "brief order description"},
+			"orders[].url":                   {Description: "optional absolute http(s) link to the order's source; copy the backlog item's url when it has one, otherwise omit (a missing or malformed link leaves a plain title)"},
 			"orders[].plan[]":                {Description: "linked plan path(s), e.g. plans/15-bootstrap-onboarding/overview"},
 			"orders[].rationale":             {Description: "placement reason citing a rule or principle"},
 			"orders[].stages[].do":           {Description: "task key (must match a task_types[].key from mise)"},

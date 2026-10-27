@@ -52,7 +52,7 @@ describe("snapshotToHierarchy", () => {
     expect(order1.name).toBe("Fix auth");
     expect(order1.type).toBe("order");
     expect(order1.status).toBe("active");
-    expect(order1.children).toHaveLength(2);
+    expect(order1.children).toHaveLength(1);
 
     const stage1 = must(order1.children?.[0], "missing first stage");
     expect(stage1.name).toBe("execute");
@@ -61,15 +61,48 @@ describe("snapshotToHierarchy", () => {
     expect(stage1.cost).toBe(1.23);
     expect(stage1.model).toBe("opus");
 
-    const stage2 = must(order1.children?.[1], "missing second stage");
+    const stage2 = must(stage1.children?.[0], "missing second stage");
     expect(stage2.name).toBe("quality");
     expect(stage2.status).toBe("pending");
     expect(stage2.cost).toBeUndefined();
+    expect(stage2.children).toBeUndefined();
 
     const order2 = must(tree.children?.[1], "missing second order");
     expect(order2.name).toBe("Add logging");
     expect(order2.children).toHaveLength(1);
     expect(must(order2.children?.[0], "missing order2 stage").currentAction).toBe("Write tests");
+  });
+
+  it("chains an order's stages in stage order, one child per stage", () => {
+    const snapshot = buildSnapshot({
+      orders: [
+        buildOrder({
+          id: "o1",
+          stages: [
+            buildStage({ task_key: "execute", status: "completed" }),
+            buildStage({ task_key: "quality", status: "active" }),
+            buildStage({ task_key: "adversarial-review", status: "pending" }),
+            buildStage({ task_key: "reflect", status: "pending" }),
+          ],
+        }),
+      ],
+    });
+
+    const names: string[] = [];
+    let node = must(snapshotToHierarchy(snapshot).children?.[0], "missing order");
+    while (node.children) {
+      expect(node.children).toHaveLength(1);
+      node = must(node.children[0], "missing chained stage");
+      names.push(node.name);
+    }
+    expect(names).toEqual(["execute", "quality", "adversarial-review", "reflect"]);
+  });
+
+  it("keeps orders side by side under the scheduler", () => {
+    const snapshot = buildSnapshot({
+      orders: [buildOrder({ id: "o1" }), buildOrder({ id: "o2" }), buildOrder({ id: "o3" })],
+    });
+    expect(snapshotToHierarchy(snapshot).children).toHaveLength(3);
   });
 
   it("uses order id when title is missing", () => {

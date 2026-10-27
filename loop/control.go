@@ -220,7 +220,9 @@ func appendAcks(path string, acks []ControlAck) error {
 
 func (l *Loop) applyControlCommand(cmd ControlCommand) ControlAck {
 	ack := ControlAck{ID: cmd.ID, Action: cmd.Action, Status: "ok", At: l.deps.Now()}
+	l.cmds.ackMessage = ""
 	err := l.dispatchControlCommand(cmd)
+	ack.Message = l.cmds.ackMessage
 	if err != nil {
 		ack.Status = "error"
 		ack.Message = err.Error()
@@ -251,6 +253,10 @@ func (l *Loop) dispatchControlCommand(cmd ControlCommand) error {
 		return l.controlSteer(cmd.Target, cmd.Prompt)
 	case "merge":
 		return l.controlMerge(cmd.OrderID)
+	case "approve":
+		return l.controlApprove(cmd.OrderID)
+	case "approve-and-publish":
+		return l.controlApproveAndPublish(cmd.OrderID)
 	case "reject":
 		return l.controlReject(cmd.OrderID)
 	case "request-changes":
@@ -276,6 +282,8 @@ func (l *Loop) dispatchControlCommand(cmd ControlCommand) error {
 		return l.controlAdvance(cmd.OrderID)
 	case "add-stage":
 		return l.controlAddStage(cmd)
+	case "stage-complete":
+		return l.controlStageComplete(cmd.OrderID, cmd.TaskKey, cmd.Prompt, stringx.Normalize(cmd.Value) == "reject")
 	case "park-review":
 		return l.controlParkReview(cmd.OrderID, cmd.Prompt)
 	default:

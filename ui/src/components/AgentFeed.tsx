@@ -6,6 +6,9 @@ import { Tooltip } from "./Tooltip";
 import { StreamingDelta } from "./StreamingDelta";
 import { groupConsecutiveTools } from "./group-tools";
 import { VirtualizedFeed } from "./VirtualizedFeed";
+import { isBusy, sendReported } from "./control-feedback";
+import { ControlResult } from "./ControlResult";
+import { PendingSteers, usePendingSteers } from "./PendingSteers";
 
 function statusColor(status: string): string {
   if (status === "running") {
@@ -21,10 +24,12 @@ function AgentHeader({
   session,
   onStopAll,
   isPending,
+  isStopAllBusy,
 }: {
   session: Session;
   onStopAll: () => void;
   isPending: boolean;
+  isStopAllBusy: boolean;
 }) {
   const color = statusColor(session.status);
   return (
@@ -52,6 +57,7 @@ function AgentHeader({
           className="feed-action-btn stop-btn"
           onClick={onStopAll}
           disabled={isPending}
+          aria-busy={isStopAllBusy || undefined}
         >
           Stop All
         </button>
@@ -64,7 +70,9 @@ export function AgentFeed({ sessionId }: { sessionId: string }) {
   const { data: snapshot } = useSuspenseSnapshot();
   const initialEvents = snapshot.events_by_session[sessionId];
   const { data: events = [] } = useSessionEvents(sessionId, initialEvents);
-  const { mutate: send, isPending: isControlPending } = useSendControl();
+  const control = useSendControl();
+  const { mutate: send, isPending: isControlPending } = control;
+  const pendingSteers = usePendingSteers(send, sessionId, events);
   const [input, setInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -90,7 +98,7 @@ export function AgentFeed({ sessionId }: { sessionId: string }) {
     if (!prompt) {
       return;
     }
-    send({ action: "steer", target: sessionId, prompt });
+    pendingSteers.submit(sessionId, prompt);
     setInput("");
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -105,11 +113,11 @@ export function AgentFeed({ sessionId }: { sessionId: string }) {
   }
 
   function handleStopAll() {
-    send({ action: "stop-all" });
+    sendReported(send, { action: "stop-all" }, "Stop All");
   }
 
   function handleStop() {
-    send({ action: "stop", name: sessionId });
+    sendReported(send, { action: "stop", name: sessionId }, "Stop");
   }
 
   // Find the order_id for this session by matching session_id on stages.
@@ -119,7 +127,7 @@ export function AgentFeed({ sessionId }: { sessionId: string }) {
 
   function handleForceComplete() {
     if (orderForSession) {
-      send({ action: "advance", order_id: orderForSession.id });
+      sendReported(send, { action: "advance", order_id: orderForSession.id }, "Force Complete");
     }
   }
 
@@ -141,13 +149,23 @@ export function AgentFeed({ sessionId }: { sessionId: string }) {
 
   return (
     <>
-      <AgentHeader session={session} onStopAll={handleStopAll} isPending={isControlPending} />
+      <AgentHeader
+        session={session}
+        onStopAll={handleStopAll}
+        isPending={isControlPending}
+        isStopAllBusy={isBusy(control, "stop-all")}
+      />
 
       <div className="feed-watermark">NOODLE</div>
 
       <VirtualizedFeed
         items={items}
-        tail={isSessionThinking ? <StreamingDelta sessionId={sessionId} /> : undefined}
+        tail={
+          <>
+            <PendingSteers steers={pendingSteers.steers} />
+            {isSessionThinking && <StreamingDelta sessionId={sessionId} />}
+          </>
+        }
       />
 
       {pendingReview && <ReviewBanner review={pendingReview} />}
@@ -195,8 +213,9 @@ export function AgentFeed({ sessionId }: { sessionId: string }) {
                 className="btn-stop"
                 onClick={handleStop}
                 disabled={isControlPending}
+                aria-busy={isBusy(control, "stop") || undefined}
               >
-                {isControlPending ? "Stopping…" : "Stop"}
+                {isBusy(control, "stop") ? "Stopping…" : "Stop"}
               </button>
             )}
             {orderForSession && (
@@ -206,8 +225,9 @@ export function AgentFeed({ sessionId }: { sessionId: string }) {
                   className="btn-complete"
                   onClick={handleForceComplete}
                   disabled={isControlPending}
+                  aria-busy={isBusy(control, "advance") || undefined}
                 >
-                  {isControlPending ? "Completing…" : "Mark Complete"}
+                  {isBusy(control, "advance") ? "Completing…" : "Mark Complete"}
                 </button>
               </Tooltip>
             )}
@@ -216,11 +236,17 @@ export function AgentFeed({ sessionId }: { sessionId: string }) {
               className="btn-submit"
               onClick={handleSubmit}
               disabled={isControlPending || !input.trim()}
+              aria-busy={isBusy(control, "steer") || undefined}
             >
               Send
             </button>
           </div>
         </div>
+        <ControlResult
+          mutation={control}
+          labels={{ "stop-all": "Stop All", stop: "Stop", advance: "Mark Complete", steer: "Send" }}
+          subject={sessionId}
+        />
       </div>
     </>
   );

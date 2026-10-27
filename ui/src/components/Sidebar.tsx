@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { useActiveChannel, useSuspenseSnapshot, useWSStatus, formatCost } from "~/client";
 import type { ChannelId, StageStatus } from "~/client";
+import { Badge } from "./Badge";
+import { PublishButton } from "./PublishButton";
+import { DraftPRLink } from "./DraftPRLink";
+import { OrderSourceLink } from "./order-link";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
   LayoutGrid,
@@ -11,6 +15,7 @@ import {
   Check,
   X,
   Square,
+  Minus,
   ChevronRight,
 } from "lucide-react";
 import { OverflowTooltip } from "./OverflowTooltip";
@@ -21,7 +26,7 @@ const stageStatusIcon: Record<StageStatus, { icon: React.ReactNode; cls: string 
   pending: { icon: <Square size={11} />, cls: "stage-pending" },
   completed: { icon: <Check size={11} />, cls: "stage-done" },
   failed: { icon: <X size={11} />, cls: "stage-done" },
-  cancelled: { icon: <Square size={11} />, cls: "stage-pending" },
+  cancelled: { icon: <Minus size={11} />, cls: "stage-skipped" },
 };
 
 function ConnectionDot() {
@@ -254,8 +259,17 @@ export function Sidebar() {
               >
                 <ChevronRight className={`tree-chevron ${isExpanded ? "open" : ""}`} size={14} />
                 <OverflowTooltip className="tree-label" text={orderLabel} />
+                {order.status === "awaiting-publish" && <Badge type="awaiting publish" />}
                 {hasActiveStage && <div className="status-dot active" />}
               </button>
+              <OrderSourceLink url={order.url} />
+              <PublishButton order={order} />
+              {snapshot.draft_prs?.[order.id] && (
+                <DraftPRLink
+                  url={snapshot.draft_prs[order.id]?.url ?? ""}
+                  branch={snapshot.draft_prs[order.id]?.branch}
+                />
+              )}
               <div className={`tree-stages ${isExpanded ? "open" : ""}`}>
                 {order.stages.map((stage, i) => {
                   let stageSessionID = stage.session_id;

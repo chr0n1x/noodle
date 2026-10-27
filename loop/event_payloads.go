@@ -61,6 +61,7 @@ type StageFailedPayload struct {
 
 type OrderCompletedPayload struct {
 	OrderID string `json:"order_id"`
+	Outcome string `json:"outcome,omitempty"`
 }
 
 type OrderFailedPayload struct {

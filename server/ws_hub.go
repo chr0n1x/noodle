@@ -359,7 +359,7 @@ func parseControlRequest(action string, req controlRequest) (loop.ControlCommand
 		"reorder": true, "stop": true, "set-max-concurrency": true,
 		"advance": true,
 	}
-	if !validActions[action] {
+	if !validActions[action] && !isForkControlAction(action) {
 		return loop.ControlCommand{}, fmt.Errorf("unknown action: %s", action)
 	}
 	return loop.ControlCommand{

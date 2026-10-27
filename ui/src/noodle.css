@@ -439,6 +439,13 @@
 .tree-stage.stage-pending .tree-icon {
   color: var(--color-text-tertiary);
 }
+.tree-stage.stage-skipped {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+.tree-stage.stage-skipped .tree-icon {
+  color: var(--color-text-tertiary);
+}
 .tree-stage-label {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1662,6 +1669,11 @@ foreignObject.node.node-clickable .tree-node-card:active {
 .stage-dot.pending {
   background: var(--color-text-tertiary);
 }
+.stage-dot.skipped {
+  height: 2px;
+  background: var(--color-text-tertiary);
+  opacity: 0.45;
+}
 .stage-dot.failed {
   background: var(--color-red);
 }
@@ -1905,7 +1917,68 @@ foreignObject.node.node-clickable .tree-node-card:active {
   cursor: not-allowed;
 }
 
-.review-action-btn:hover {
+/* Decorative spinner inside a control button (or pending steer) until the loop acks. */
+button[aria-busy="true"]::before,
+.pending-steer[aria-busy="true"] .msg-meta::before {
+  content: "";
+  display: inline-block;
+  flex: none;
+  width: 0.9em;
+  height: 0.9em;
+  margin-right: 0.45em;
+  vertical-align: -0.15em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: control-spin 0.7s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes control-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button[aria-busy="true"]::before,
+  .pending-steer[aria-busy="true"] .msg-meta::before {
+    animation-duration: 2.5s;
+  }
+}
+
+.control-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+  margin-top: 6px;
+  padding: 4px 6px;
+  border-left: 2px solid currentColor;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.control-result-success {
+  color: var(--color-green);
+}
+
+.control-result-error {
+  color: var(--color-red);
+}
+
+.control-result-text {
+  flex: 1;
+}
+
+.control-result-dismiss {
+  flex: none;
+  color: var(--color-text-tertiary);
+  text-decoration: underline;
+  font-size: 10px;
+}
+
+.review-action-btn:hover:not(:disabled) {
   opacity: 0.88;
 }
 .review-action-btn:active {
@@ -1924,7 +1997,7 @@ foreignObject.node.node-clickable .tree-node-card:active {
   border-color: var(--color-border-subtle);
 }
 
-.review-action-outline:hover {
+.review-action-outline:hover:not(:disabled) {
   background: var(--color-bg-surface);
   border-color: var(--color-border-active);
   color: var(--color-text-primary);
@@ -1936,7 +2009,7 @@ foreignObject.node.node-clickable .tree-node-card:active {
   border-color: rgba(248, 113, 113, 0.1);
 }
 
-.review-action-danger:hover {
+.review-action-danger:hover:not(:disabled) {
   background: rgba(248, 113, 113, 0.1);
   border-color: var(--color-red);
 }

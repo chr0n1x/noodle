@@ -6,7 +6,7 @@ const dotClass: Record<StageStatus, string> = {
   merging: "active",
   pending: "pending",
   failed: "failed",
-  cancelled: "pending",
+  cancelled: "skipped",
 };
 
 export function StageRail({ stages }: { stages: Stage[] }) {

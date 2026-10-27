@@ -26,6 +26,7 @@ export {
   sendControl,
   fetchConfig,
 } from "./api";
+export { waitForControlAck } from "./control-ack";
 export {
   connectWS,
   SNAPSHOT_KEY,

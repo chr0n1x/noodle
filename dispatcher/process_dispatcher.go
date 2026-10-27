@@ -170,14 +170,14 @@ func (d *ProcessDispatcher) startSessionProcess(
 		return nil, nil, fmt.Errorf("build command: %w", err)
 	}
 	cmd.Dir = req.WorktreePath
-	cmd.Env = append(buildDispatchEnv(req), "NOODLE_SESSION_ID="+sessionID)
+	cmd.Env = d.sessionEnv(req, sessionID)
 
 	process, err := StartProcess(cmd)
 	if err != nil {
 		return nil, nil, fmt.Errorf("start process: %w", err)
 	}
 
-	controller, err := d.configureStdin(ctx, process, req.Provider, composedPrompt)
+	controller, err := d.configureStdin(ctx, process, req.Provider, composedPrompt, d.closeStdinAfterTurn(req))
 	if err != nil {
 		_ = process.ForceKill()
 		return nil, nil, err
@@ -196,12 +196,19 @@ func (d *ProcessDispatcher) startSessionProcess(
 	return controller, process, nil
 }
 
+// closeStdinAfterTurn reports whether a Claude session's stdin is closed when
+// its turn finishes: only with [agents.claude] exit_after_turn, and never for
+// keep-alive sessions such as the scheduler.
+func (d *ProcessDispatcher) closeStdinAfterTurn(req DispatchRequest) bool {
+	return d.providerConfigs.Claude.ExitAfterTurn && !req.KeepAlive
+}
+
 // configureStdin sets up stdin handling for the started process. For Claude,
 // creates a controller that owns stdin for live steering and sends the prompt
 // as the first stream-json user message. For other providers (codex), writes
 // the prompt to stdin and closes it.
 func (d *ProcessDispatcher) configureStdin(
-	ctx context.Context, process *ProcessHandle, provider, composedPrompt string,
+	ctx context.Context, process *ProcessHandle, provider, composedPrompt string, closeOnIdle bool,
 ) (*claudeController, error) {
 	if stringx.Normalize(provider) == "codex" {
 		go func() {
@@ -210,7 +217,7 @@ func (d *ProcessDispatcher) configureStdin(
 		}()
 		return nil, nil
 	}
-	controller := newClaudeController(process.Stdin())
+	controller := newClaudeController(process.Stdin(), closeOnIdle)
 	if err := controller.SendMessage(ctx, composedPrompt); err != nil {
 		return nil, fmt.Errorf("send initial prompt: %w", err)
 	}
@@ -314,3 +321,14 @@ func replaceFlag(args []string, old string, newKey, newVal string) []string {
 }
 
 var _ Dispatcher = (*ProcessDispatcher)(nil)
+
+// sessionEnv is the cook's environment. The cook runs in its worktree, so
+// NOODLE_PROJECT_DIR points `noodle event emit` and other commands at the
+// main checkout's .noodle, where the loop reads session events.
+func (d *ProcessDispatcher) sessionEnv(req DispatchRequest, sessionID string) []string {
+	env := append(buildDispatchEnv(req), "NOODLE_SESSION_ID="+sessionID)
+	if d.projectDir != "" {
+		env = append(env, "NOODLE_PROJECT_DIR="+d.projectDir)
+	}
+	return env
+}

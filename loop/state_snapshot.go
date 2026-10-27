@@ -37,6 +37,15 @@ type LoopState struct {
 	TotalCostUSD       float64                 `json:"total_cost_usd"`
 	MaxConcurrency     int                     `json:"max_concurrency"`
 	Warnings           []string                `json:"warnings"`
+	DraftPR            bool                    `json:"draft_pr"`
+	// ReviewBlocks lists, per order ID, review actions refused because the
+	// order's external review stages are not done.
+	ReviewBlocks map[string]ReviewActionBlock `json:"review_blocks,omitempty"`
+	// PublishGated is true when orders publish once at the end (see orderGated).
+	PublishGated bool `json:"publish_gated,omitempty"`
+	// PublishBlocks maps order ID to the reason approve-and-publish is refused;
+	// gated configs only, and awaiting-publish orders have no entry.
+	PublishBlocks map[string]string `json:"publish_blocks,omitempty"`
 }
 
 func (l *Loop) publishState() {
@@ -82,6 +91,10 @@ func (l *Loop) buildLoopStateSnapshot() *LoopState {
 		TotalCostUSD:       totalCost,
 		MaxConcurrency:     l.config.Concurrency.MaxConcurrency,
 		Warnings:           append([]string(nil), l.lastMiseWarnings...),
+		DraftPR:            l.deps.DraftPR != nil,
+		ReviewBlocks:       l.reviewActionBlocks(),
+		PublishGated:       l.orderGated(),
+		PublishBlocks:      l.publishBlocks(),
 	}
 }
 
@@ -140,6 +153,7 @@ func cloneLoopState(state LoopState) LoopState {
 		cloned.Projection.Orders = append(cloned.Projection.Orders, projection.OrderProjection{
 			ID:        order.ID,
 			Title:     order.Title,
+			URL:       order.URL,
 			Plan:      append([]string(nil), order.Plan...),
 			Rationale: order.Rationale,
 			Status:    order.Status,
@@ -154,6 +168,18 @@ func cloneLoopState(state LoopState) LoopState {
 	cloned.ActiveCooks = append([]CookSummary(nil), state.ActiveCooks...)
 	cloned.RecentHistory = append([]mise.HistoryItem(nil), state.RecentHistory...)
 	cloned.Warnings = append([]string(nil), state.Warnings...)
+	if state.ReviewBlocks != nil {
+		cloned.ReviewBlocks = make(map[string]ReviewActionBlock, len(state.ReviewBlocks))
+		for id, block := range state.ReviewBlocks {
+			cloned.ReviewBlocks[id] = ReviewActionBlock{Actions: append([]string(nil), block.Actions...), Reason: block.Reason}
+		}
+	}
+	if state.PublishBlocks != nil {
+		cloned.PublishBlocks = make(map[string]string, len(state.PublishBlocks))
+		for id, reason := range state.PublishBlocks {
+			cloned.PublishBlocks[id] = reason
+		}
+	}
 	cloned.ActiveSummary = mise.ActiveSummary{
 		Total:     state.ActiveSummary.Total,
 		ByTaskKey: make(map[string]int, len(state.ActiveSummary.ByTaskKey)),

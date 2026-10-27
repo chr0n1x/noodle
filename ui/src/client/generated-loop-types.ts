@@ -19,4 +19,16 @@ export interface PendingReviewItem {
   worktree_path: string;
   session_id?: string;
   reason?: string;
+  /**
+   * BlockedActions lists control actions the loop refuses for this review
+   * (approve and merge on an external hold, merge in a gated order);
+   * BlockedReason says why.
+   */
+  blocked_actions?: string[];
+  blocked_reason?: string;
+  /**
+   * PublishGated is set by the snapshot when the config gates publishing,
+   * where request-changes re-runs the stage instead of failing the order.
+   */
+  publish_gated?: boolean;
 }

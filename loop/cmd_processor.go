@@ -6,4 +6,5 @@ type cmdProcessor struct {
 	processedIDs   map[string]struct{}
 	cmdSeqCounter  uint64
 	lastAppliedSeq uint64
+	ackMessage     string
 }

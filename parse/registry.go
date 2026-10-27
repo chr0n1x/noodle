@@ -37,6 +37,7 @@ var claudeLineTypes = map[string]struct{}{
 	"user":             {},
 	"rate_limit_event": {},
 	"controlresponse":  {},
+	"tool_progress":    {},
 }
 
 func NewRegistry() *Registry {

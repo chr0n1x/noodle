@@ -60,6 +60,8 @@ created:
 		a.info("Symlinked .claude/settings.local.json")
 	}
 
+	a.linkPaths(wtPath)
+
 	a.installDeps(wtPath)
 
 	a.printf("\nWorktree ready: %s (branch: %s)\n", wtPath, name)

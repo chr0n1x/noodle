@@ -17,7 +17,7 @@ Follow these project-specific rules when creating commits.
 ## Project Rules
 
 - **One commit per logical change** — never combine unrelated fixes or features. Three independent changes = three commits.
-- **Only commit files you changed** — never pull in unrelated files from concurrent sessions.
+- **Only commit files you changed** — never pull in unrelated files from concurrent sessions. Stage only files you created or edited for this item, each by explicit path; never stage a file just because it shows in `git status`. Never `git add -A`, `git add .`, `git add *` or `git commit -a`. Check `git diff --cached --stat` before every commit and keep the diff to the files the backlog item names.
 - **Always include a body** — no title-only commits. Explain what and why.
 - **`merge` type** — use `merge` (not a merge commit) when merging a worktree or feature branch.
 - **Sequence commits** to maximise option value — foundational infrastructure first, then features that build on it.

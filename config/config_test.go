@@ -691,3 +691,72 @@ func TestMaxConcurrentForLookup(t *testing.T) {
 		}
 	}
 }
+
+func TestParseOptInLoopSettings(t *testing.T) {
+	config, err := Parse([]byte(`
+[concurrency]
+max_concurrency = 2
+exclude_scheduler = true
+
+[agents.claude]
+exit_after_turn = true
+`))
+	if err != nil {
+		t.Fatalf("Parse config: %v", err)
+	}
+	if !config.Concurrency.ExcludeScheduler {
+		t.Fatal("concurrency.exclude_scheduler not parsed")
+	}
+	if !config.Agents.Claude.ExitAfterTurn {
+		t.Fatal("agents.claude.exit_after_turn not parsed")
+	}
+
+	defaults, err := Parse([]byte(""))
+	if err != nil {
+		t.Fatalf("Parse empty config: %v", err)
+	}
+	if defaults.Concurrency.ExcludeScheduler || defaults.Agents.Claude.ExitAfterTurn {
+		t.Fatal("opt-in settings must default to off")
+	}
+}
+
+func TestParseWorktreeLink(t *testing.T) {
+	config, err := Parse([]byte(`
+[worktree]
+link = ["brain", ".noodle.toml"]
+`))
+	if err != nil {
+		t.Fatalf("Parse config: %v", err)
+	}
+	if got := strings.Join(config.Worktree.Link, ","); got != "brain,.noodle.toml" {
+		t.Fatalf("worktree.link = %q", got)
+	}
+}
+
+func TestParseDelivery(t *testing.T) {
+	config, err := Parse([]byte(`
+[delivery]
+push_remote = "origin"
+pr_repo = "acme/widgets"
+base = "main"
+`))
+	if err != nil {
+		t.Fatalf("Parse config: %v", err)
+	}
+	d := config.Delivery
+	if d.PushRemote != "origin" || d.PRRepo != "acme/widgets" || d.Base != "main" {
+		t.Fatalf("delivery = %+v", d)
+	}
+	if d.BranchTemplate() != "noodle/{order_id}" {
+		t.Fatalf("default branch template = %q", d.BranchTemplate())
+	}
+	if !d.Enabled() {
+		t.Fatal("delivery with remote, repo and base should be enabled")
+	}
+	if (DeliveryConfig{PushRemote: "origin"}).Enabled() {
+		t.Fatal("partial delivery config should be disabled")
+	}
+	if DefaultConfig().Delivery.Enabled() {
+		t.Fatal("delivery should be disabled by default")
+	}
+}

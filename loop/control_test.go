@@ -14,6 +14,25 @@ import (
 	loopruntime "github.com/poteto/noodle/runtime"
 )
 
+// mergePending approves and merges the order's parked stage without the
+// control-action guard.
+func mergePending(l *Loop, orderID string) error {
+	pending, ok := l.cooks.pendingReview[orderID]
+	if !ok {
+		return errors.New("no pending review for " + orderID)
+	}
+	if err := l.ensureCanonicalOrderFromOrders(orderID); err != nil {
+		return err
+	}
+	return l.approveAndMerge(&cookHandle{
+		cookIdentity: pending.cookIdentity,
+		orderStatus:  OrderStatusActive,
+		worktreeName: pending.worktreeName,
+		worktreePath: pending.worktreePath,
+		session:      &adoptedSession{id: pending.sessionID, status: "completed"},
+	}, "approved by user")
+}
+
 func newControlTestLoop(t *testing.T, wt *fakeWorktree, rt *mockRuntime) *Loop {
 	t.Helper()
 	projectDir := t.TempDir()
@@ -560,7 +579,7 @@ func TestControlMergeFinalStageActiveOrderFiresDone(t *testing.T) {
 
 func TestControlOrderIDFieldDecodedCorrectly(t *testing.T) {
 	// Verify JSON decoding of the renamed field.
-	raw := `{"id":"cmd-1","action":"merge","order_id":"42"}`
+	raw := `{"id":"cmd-1","action":"approve","order_id":"42"}`
 	var cmd ControlCommand
 	if err := json.Unmarshal([]byte(raw), &cmd); err != nil {
 		t.Fatalf("unmarshal: %v", err)
@@ -912,5 +931,48 @@ func TestFailedOrderRequiresRequeueBeforeDispatch(t *testing.T) {
 	candidates = dispatchableStages(orders, nil, nil, nil)
 	if len(candidates) != 1 {
 		t.Fatalf("candidates = %d, want 1 after requeue", len(candidates))
+	}
+}
+
+func TestControlRequestChangesKeepsWorktree(t *testing.T) {
+	wt := &fakeWorktree{}
+	l := newControlTestLoop(t, wt, newMockRuntime())
+	sched := &mockController{steerable: true}
+	l.cooks.activeCooksByOrder["schedule"] = &cookHandle{
+		cookIdentity: cookIdentity{orderID: "schedule", stage: Stage{TaskKey: "schedule", Skill: "schedule"}},
+		session: &steerableSession{
+			mockSession: &mockSession{id: "schedule-session", status: "running", done: make(chan struct{})},
+			ctrl:        sched,
+		},
+	}
+
+	if err := l.controlRequestChanges("42", "Add missing tests"); err != nil {
+		t.Fatalf("controlRequestChanges: %v", err)
+	}
+	if len(wt.cleaned) != 0 {
+		t.Fatalf("worktree cleaned = %v, want kept", wt.cleaned)
+	}
+	if _, ok := l.cooks.pendingReview["42"]; ok {
+		t.Fatal("pending review item should be removed after request-changes")
+	}
+	orders, err := readOrders(l.deps.OrdersFile)
+	if err != nil {
+		t.Fatalf("read orders: %v", err)
+	}
+	if len(orders.Orders) != 1 || orders.Orders[0].Status != OrderStatusFailed {
+		t.Fatalf("orders = %+v, want order 42 failed", orders.Orders)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		sched.mu.Lock()
+		msg := sched.lastSentMessage
+		sched.mu.Unlock()
+		if strings.Contains(msg, "[request_changes]") && strings.Contains(msg, "Add missing tests") {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("scheduler message = %q, want request_changes forward", msg)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }

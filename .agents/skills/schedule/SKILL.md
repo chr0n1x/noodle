@@ -20,6 +20,10 @@ This is the cardinal scheduling rule. Pick the highest-priority plan with remain
 
 Output is `{orders: [...]}` where each order is a **pipeline of stages** executed sequentially. Group related work into stages within one order rather than separate orders.
 
+**Order titles** are shown to the human in the sidebar and on review tabs, so make them identifiable at a glance: lead with the ticket key(s) when the backlog item has one, then a 3-6 word plain summary of the change. Avoid raw case IDs or snake_case names as the whole title.
+
+**Order links:** when the backlog item has a `url` (its ticket, issue or pull request), copy it unchanged into the order's `url` so the title links to it. Use only a link the item gives you as a full `http(s)://` address; never build one from a ticket key or guess a host. With no such link, omit `url` and the title stays plain text.
+
 ### Stages
 
 Each stage has a `do` field (task key, must match a registered task type) and runs one at a time within the order. The loop advances to the next stage when the current one completes.
@@ -76,7 +80,7 @@ Don't react mechanically to every event. Use judgment: a single stage failure in
 
 ## Model Routing
 
-See [references/model-routing.md](references/model-routing.md) for model selection.
+**Required first step:** before choosing any provider or model for any stage, read `brain/principles/model-routing.md` if it exists. When it exists, use only the providers and models it allows and ignore [references/model-routing.md](references/model-routing.md). Only when it is absent, use [references/model-routing.md](references/model-routing.md) for model selection.
 
 ## Runtime Routing
 

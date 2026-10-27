@@ -186,6 +186,7 @@ func synthesizeCanonicalState(
 			Stages:    stageNodes,
 			CreatedAt: now,
 			UpdatedAt: now,
+			Metadata:  withOrderURL(nil, order.URL),
 		}
 	}
 
@@ -199,12 +200,33 @@ func synthesizeCanonicalState(
 	}
 }
 
+// withOrderURL returns a copy of metadata with "url" set to the order's link,
+// or removed when the order has none; the canonical order keeps its link there.
+func withOrderURL(metadata map[string]string, url string) map[string]string {
+	url = strings.TrimSpace(url)
+	if url == "" && len(metadata) == 0 {
+		return metadata
+	}
+	out := make(map[string]string, len(metadata)+1)
+	for key, value := range metadata {
+		out[key] = value
+	}
+	if url == "" {
+		delete(out, "url")
+	} else {
+		out["url"] = url
+	}
+	return out
+}
+
 func legacyOrderStatusToCanonical(status orderx.OrderStatus) state.OrderLifecycleStatus {
 	switch status {
 	case OrderStatusFailed:
 		return state.OrderFailed
 	case OrderStatusCompleted:
 		return state.OrderCompleted
+	case OrderStatusAwaitingPublish:
+		return state.OrderAwaitingPublish
 	default:
 		return state.OrderActive
 	}
@@ -222,6 +244,8 @@ func legacyStageStatusToCanonical(status orderx.StageStatus) state.StageLifecycl
 		return state.StageFailed
 	case StageStatusCancelled:
 		return state.StageCancelled
+	case StageStatusSkipped:
+		return state.StageSkipped
 	default:
 		return state.StagePending
 	}
@@ -297,6 +321,7 @@ func (l *Loop) syncCanonicalOrderFromLegacyAt(order Order, sequence int) {
 			"stages":   stages,
 			"metadata": map[string]string{
 				"title":     strings.TrimSpace(order.Title),
+				"url":       strings.TrimSpace(order.URL),
 				"plan":      strings.Join(order.Plan, "\n"),
 				"rationale": strings.TrimSpace(order.Rationale),
 			},
@@ -309,6 +334,7 @@ func (l *Loop) syncCanonicalOrderFromLegacyAt(order Order, sequence int) {
 		node.Sequence = sequence
 	}
 	node.Title = strings.TrimSpace(order.Title)
+	node.Metadata = withOrderURL(node.Metadata, order.URL)
 	node.Plan = slices.Clone(order.Plan)
 	node.Rationale = strings.TrimSpace(order.Rationale)
 	node.Status = legacyOrderStatusToCanonical(order.Status)
@@ -336,6 +362,10 @@ func (l *Loop) syncCanonicalOrderFromLegacyAt(order Order, sequence int) {
 				mergeCopy := *node.Stages[i].Merge
 				stageNode.Merge = &mergeCopy
 			}
+		}
+		// orders.json stores a parked stage as active; the pending review says it is parked.
+		if review, ok := l.canonical.PendingReviews[order.ID]; ok && review.StageIndex == i && stageNode.Status == state.StageRunning {
+			stageNode.Status = state.StageReview
 		}
 		if mergeRecovery := canonicalMergeRecoveryFromLegacyStage(stage, stageNode.Status); mergeRecovery != nil {
 			stageNode.Merge = mergeRecovery

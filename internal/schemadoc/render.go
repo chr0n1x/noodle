@@ -260,9 +260,12 @@ func isTimeType(t reflect.Type) bool {
 	return t.PkgPath() == "time" && t.Name() == "Time"
 }
 
+var rawMessageType = reflect.TypeOf(json.RawMessage{})
+
+// isRawMessageType compares against the real type rather than its package path and name, because
+// newer Go releases define json.RawMessage as an alias of another package's type.
 func isRawMessageType(t reflect.Type) bool {
-	t = derefType(t)
-	return t.PkgPath() == "encoding/json" && t.Name() == "RawMessage"
+	return derefType(t) == rawMessageType
 }
 
 func joinPath(parent, child string) string {

@@ -92,6 +92,10 @@ func LoadSnapshot(runtimeDir string, now time.Time, state loop.LoopState) (Snaps
 		}
 	}
 
+	var publishErrors map[string]string
+	if state.PublishGated {
+		publishErrors = loop.ReadPublishErrors(runtimeDir)
+	}
 	orders := make([]Order, 0, len(projected.Orders))
 	for _, order := range projected.Orders {
 		activeSessionID := cookSessionByOrder[order.ID]
@@ -119,10 +123,15 @@ func LoadSnapshot(runtimeDir string, now time.Time, state loop.LoopState) (Snaps
 		orders = append(orders, Order{
 			ID:        order.ID,
 			Title:     order.Title,
+			URL:       order.URL,
 			Plan:      append([]string(nil), order.Plan...),
 			Rationale: order.Rationale,
 			Stages:    stages,
 			Status:    order.Status,
+			// Indexing nil maps yields "", so ungated orders get no publish fields.
+			PublishGated:         state.PublishGated,
+			PublishBlockedReason: state.PublishBlocks[order.ID],
+			PublishError:         publishErrors[order.ID],
 		})
 	}
 
@@ -145,14 +154,16 @@ func LoadSnapshot(runtimeDir string, now time.Time, state loop.LoopState) (Snaps
 		EventsBySession:    map[string][]EventLine{},
 		FeedEvents:         nonNilFeedEvents(feedEvents),
 		TotalCostUSD:       state.TotalCostUSD,
-		PendingReviews:     projectedPendingReviews(projected.PendingReviews),
+		PendingReviews:     withReviewBlocks(projectedPendingReviews(projected.PendingReviews, state.PublishGated), state.ReviewBlocks),
 		PendingReviewCount: projected.PendingReviewCount,
 		Mode:               projected.Mode,
 		MaxConcurrency:     state.MaxConcurrency,
+		DraftPR:            state.DraftPR,
+		DraftPRs:           loop.ReadDraftPRs(runtimeDir),
 	}, nil
 }
 
-func projectedPendingReviews(reviews []projection.PendingReviewProjection) []loop.PendingReviewItem {
+func projectedPendingReviews(reviews []projection.PendingReviewProjection, gated bool) []loop.PendingReviewItem {
 	items := make([]loop.PendingReviewItem, 0, len(reviews))
 	for _, review := range reviews {
 		items = append(items, loop.PendingReviewItem{
@@ -169,7 +180,18 @@ func projectedPendingReviews(reviews []projection.PendingReviewProjection) []loo
 			WorktreePath: review.WorktreePath,
 			SessionID:    review.SessionID,
 			Reason:       review.Reason,
+			PublishGated: gated,
 		})
+	}
+	return items
+}
+
+func withReviewBlocks(items []loop.PendingReviewItem, blocks map[string]loop.ReviewActionBlock) []loop.PendingReviewItem {
+	for i := range items {
+		if block, ok := blocks[items[i].OrderID]; ok {
+			items[i].BlockedActions = append([]string(nil), block.Actions...)
+			items[i].BlockedReason = block.Reason
+		}
 	}
 	return items
 }

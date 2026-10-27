@@ -61,7 +61,10 @@ type orderStagePayload struct {
 	MergeBranch  string `json:"merge_branch"`
 	Error        string `json:"error"`
 	Mergeable    *bool  `json:"mergeable"`
-	ExitCode     *int   `json:"exit_code"`
+	// HoldForPublish marks a gated order: when its last stage completes the
+	// order waits for publish instead of completing.
+	HoldForPublish bool `json:"hold_for_publish"`
+	ExitCode       *int `json:"exit_code"`
 }
 
 type reviewPayload struct {
@@ -79,6 +82,9 @@ type reviewPayload struct {
 	Runtime      string   `json:"runtime"`
 	Skill        string   `json:"skill"`
 	Plan         []string `json:"plan"`
+	// Rerun marks a request-changes that sends the stage back to pending
+	// for another run instead of failing the order.
+	Rerun bool `json:"rerun,omitempty"`
 }
 
 type orderPayload struct {
@@ -234,11 +240,21 @@ func reduceStageCompleted(current state.State, event ingest.StateEvent) (state.S
 
 	if allStagesTerminal(order) {
 		order.Status = state.OrderCompleted
+		if payload.HoldForPublish {
+			order.Status = state.OrderAwaitingPublish
+		}
 	}
 
 	next.Orders[payload.OrderID] = order
 	next.LastEventID = strconv.FormatUint(uint64(event.ID), 10)
 
+	if order.Status == state.OrderAwaitingPublish {
+		effect, err := makeEffect(event, 0, EffectWriteProjection, map[string]any{"order_id": payload.OrderID})
+		if err != nil {
+			return current, nil, fmt.Errorf("reduce stage_completed projection: %w", err)
+		}
+		return next, []Effect{effect}, nil
+	}
 	if order.Status == state.OrderCompleted {
 		e0, err := makeEffect(event, 0, EffectWriteProjection, map[string]any{"order_id": payload.OrderID})
 		if err != nil {
@@ -677,6 +693,10 @@ func reduceStageReviewChangesRequested(current state.State, event ingest.StateEv
 	}
 	order.Stages[payload.StageIndex] = stage
 	order.Status = state.OrderFailed
+	if payload.Rerun {
+		order.Stages[payload.StageIndex].Status = state.StagePending
+		order.Status = state.OrderActive
+	}
 	order.UpdatedAt = event.Timestamp
 	next.Orders[payload.OrderID] = order
 	delete(next.PendingReviews, payload.OrderID)

@@ -415,3 +415,18 @@ func TestCodexAdapterParsesItemStartedCommandExecution(t *testing.T) {
 		t.Fatalf("event message: got %q want %q", events[0].Message, "$ go test ./...")
 	}
 }
+
+const claudeToolProgressLine = `{"_ts":"2026-10-27T00:50:03.946881Z","elapsed_time_seconds":30,"heartbeat":true,"parent_tool_use_id":"toolu_01UewHDmcm2vMg48ufBcVRbH","session_id":"76f9509c-20b3-4c66-ab6c-9ade9e495399","tool_name":"Bash","tool_use_id":"toolu_01UewHDmcm2vMg48ufBcVRbH-heartbeat-0","type":"tool_progress","uuid":"fb2e959c-a9c0-4830-bcc2-62c3348b0929"}`
+
+func TestRegistryParsesToolProgressViaClaudeAdapter(t *testing.T) {
+	provider, events, err := NewRegistry().ParseLine([]byte(claudeToolProgressLine))
+	if err != nil {
+		t.Fatalf("parse line: %v", err)
+	}
+	if provider != "claude" {
+		t.Fatalf("provider = %q, want claude", provider)
+	}
+	if len(events) != 0 {
+		t.Fatalf("event count: got %d want 0", len(events))
+	}
+}

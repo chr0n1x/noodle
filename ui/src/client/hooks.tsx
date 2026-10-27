@@ -10,6 +10,7 @@ import {
 } from "./ws";
 import type { WSStatus } from "./ws";
 import { fetchSnapshot, fetchSessionEvents, sendControl, fetchReviewDiff } from "./api";
+import { waitForControlAck } from "./control-ack";
 import { chooseNewerSnapshot } from "./snapshot-freshness";
 import type {
   Snapshot,
@@ -122,19 +123,43 @@ export function useActiveChannel() {
   return ctx;
 }
 
+async function queueControl(cmd: ControlCommand): Promise<ControlAck> {
+  try {
+    return await sendWSControl(cmd);
+  } catch {
+    return sendControl(cmd);
+  }
+}
+
+// fetch rejects with a TypeError when the server cannot be reached at all.
+function unreachableAware(err: unknown): Error {
+  if (err instanceof TypeError) {
+    return new Error("noodle server unreachable");
+  }
+  return err instanceof Error ? err : new Error(String(err));
+}
+
+/**
+ * Sends a control command and stays pending until the loop has processed it.
+ * Rejects with the loop's message when the final ack is not ok.
+ */
 export function useSendControl() {
   const queryClient = useQueryClient();
   return useMutation<ControlAck, Error, ControlCommand>({
+    mutationKey: ["control"],
     mutationFn: async (cmd) => {
-      const cmdWithID: ControlCommand = {
-        ...cmd,
-        id: cmd.id ?? `ui-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      };
+      const id = cmd.id ?? `ui-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      let ack: ControlAck;
       try {
-        return await sendWSControl(cmdWithID);
-      } catch {
-        return sendControl(cmdWithID);
+        const queued = await queueControl({ ...cmd, id });
+        ack = queued.status === "ok" ? await waitForControlAck(id) : queued;
+      } catch (err) {
+        throw unreachableAware(err);
       }
+      if (ack.status !== "ok") {
+        throw new Error(ack.message || "unknown error");
+      }
+      return ack;
     },
     onSuccess: () => {
       // When WS is connected, snapshot pushes are authoritative and arrive

@@ -69,6 +69,9 @@ export type ControlCommand = { id?: string } & (
   | { action: "stop-all" }
   | { action: "skip"; order_id: string }
   | { action: "merge"; order_id: string }
+  | { action: "approve"; order_id: string }
+  | { action: "stage-complete"; order_id: string; task_key: string; prompt: string; value?: "accept" | "reject" }
+  | { action: "approve-and-publish"; order_id: string }
   | { action: "reject"; order_id: string }
   | { action: "requeue"; order_id: string }
   | { action: "advance"; order_id: string }

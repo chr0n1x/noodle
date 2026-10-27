@@ -52,6 +52,46 @@ func TestDefaultBacklogSyncParsesTodos(t *testing.T) {
 	}
 }
 
+func TestDefaultBacklogSyncReadsURLMarker(t *testing.T) {
+	root := t.TempDir()
+	todos := filepath.Join(root, "todos.md")
+	content := `# Todos
+
+1. [ ] Fix PROJ-123 login bug [url: https://jira.example.com/browse/PROJ-123]
+2. [ ] Item without a link
+`
+	if err := os.WriteFile(todos, []byte(content), 0o644); err != nil {
+		t.Fatalf("write todos: %v", err)
+	}
+
+	cmd := exec.Command(filepath.Join("defaults", "adapters", "backlog-sync"))
+	cmd.Env = append(os.Environ(), "NOODLE_TODOS_FILE="+todos)
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("run backlog-sync: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("line count = %d", len(lines))
+	}
+	var linked, plain map[string]any
+	if err := json.Unmarshal([]byte(lines[0]), &linked); err != nil {
+		t.Fatalf("parse line 1: %v", err)
+	}
+	if err := json.Unmarshal([]byte(lines[1]), &plain); err != nil {
+		t.Fatalf("parse line 2: %v", err)
+	}
+	if linked["url"] != "https://jira.example.com/browse/PROJ-123" {
+		t.Fatalf("url = %v", linked["url"])
+	}
+	if linked["title"] != "Fix PROJ-123 login bug" {
+		t.Fatalf("title = %q, want the marker stripped", linked["title"])
+	}
+	if _, ok := plain["url"]; ok {
+		t.Fatalf("item without a marker has url %v", plain["url"])
+	}
+}
+
 func TestDefaultBacklogAddDoneEditRoundTrip(t *testing.T) {
 	root := t.TempDir()
 	todos := filepath.Join(root, "brain", "todos.md")
@@ -92,4 +132,3 @@ func TestDefaultBacklogAddDoneEditRoundTrip(t *testing.T) {
 		t.Fatalf("unexpected todos content:\n%s", text)
 	}
 }
-

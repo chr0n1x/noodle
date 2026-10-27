@@ -123,13 +123,29 @@ func (l *Loop) handleCompletion(ctx context.Context, cook *cookHandle, resultSta
 		if isScheduleStage(cook.stage) {
 			return l.handleScheduleCompletion(cook)
 		}
+		if isPublishStage(cook.stage) {
+			return l.completePublishStage(ctx, cook)
+		}
+		if l.autoQualityOn() && cook.stage.TaskKey == "quality" {
+			if m := l.readStageMessage(cook.session.ID()); m != nil && m.IsBlocking() {
+				return l.rejectQuality(ctx, cook, m.Message)
+			}
+		}
 		blocked, msg := l.processStageMessage(cook)
 		if blocked {
 			return nil
 		}
+		if l.autoQualityOn() && cook.stage.TaskKey == "execute" {
+			if err := l.insertAutoQuality(cook); err != nil {
+				return err
+			}
+		}
 		canMerge, err := l.worktreeHasChanges(cook)
 		if err != nil {
 			return l.failStage(ctx, cook, fmt.Sprintf("merge check: %v", err))
+		}
+		if !canMerge && l.holdsNoChangeExit(cook) {
+			return l.parkPendingReview(cook, noChangeExitReason(l.lastAgentText(cook.session.ID())))
 		}
 		gate := mode.ModeGate{}
 		canAutoMerge := gate.CanAutoMerge(l.canonical.Mode)
@@ -139,6 +155,9 @@ func (l *Loop) handleCompletion(ctx context.Context, cook *cookHandle, resultSta
 				reason = "merge requires review"
 			}
 			return l.parkPendingReview(cook, reason)
+		}
+		if canMerge && l.orderGated() {
+			return l.completeKeepingWork(ctx, cook, msg)
 		}
 		mergeable := canMerge && canAutoMerge
 		if err := l.emitEventChecked(ingest.EventStageCompleted, l.mergeLifecyclePayload(cook, mergeable)); err != nil {
@@ -213,6 +232,20 @@ func (l *Loop) completeWithoutMerge(ctx context.Context, cook *cookHandle, msg *
 	return l.advanceAndPersist(ctx, cook, msg)
 }
 
+// completeKeepingWork advances a gated order's stage without merging; the
+// stage branch is kept so later stages build on it.
+func (l *Loop) completeKeepingWork(ctx context.Context, cook *cookHandle, msg *string) error {
+	if branch := strings.TrimSpace(cook.worktreeName); branch != "" {
+		if err := l.keepOrderWork(cook.orderID, branch); err != nil {
+			return err
+		}
+	}
+	if err := l.emitEventChecked(ingest.EventStageCompleted, l.mergeLifecyclePayload(cook, false)); err != nil {
+		return err
+	}
+	return l.advanceAndPersist(ctx, cook, msg)
+}
+
 // handleStageFailure handles a cook that exited with a non-success status.
 func (l *Loop) handleStageFailure(ctx context.Context, cook *cookHandle, resultStatus StageResultStatus, status string) error {
 	// Schedule cooks may write orders-next.json before exiting non-cleanly.
@@ -240,6 +273,9 @@ func (l *Loop) handleStageFailure(ctx context.Context, cook *cookHandle, resultS
 	reason := "cook exited with status " + status
 	if resultStatus == StageResultCancelled {
 		reason = "cook cancelled with status " + status
+	}
+	if isPublishStage(cook.stage) {
+		return l.failPublishStage(cook, reason)
 	}
 	return l.failStage(nil, cook, reason)
 }
@@ -306,10 +342,25 @@ func (l *Loop) advanceAndPersist(ctx context.Context, cook *cookHandle, message 
 		Message:    msg,
 	})
 
+	if orderStatus == state.OrderAwaitingPublish && !l.orderHasCommits(cook.orderID) {
+		ack := l.cmds.ackMessage
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		if err := l.finishPublishedOrder(ctx, cook.orderID, nothingToPublish); err != nil {
+			return err
+		}
+		l.cmds.ackMessage = ack
+	} else if orderStatus == state.OrderAwaitingPublish {
+		l.noteAwaitingPublish(cook.orderID)
+		l.noteKeptWork(cook.orderID)
+		l.autoPublish(cook.orderID)
+	}
 	if orderStatus == state.OrderCompleted {
 		_ = l.events.Emit(LoopEventOrderCompleted, OrderCompletedPayload{
 			OrderID: cook.orderID,
 		})
+		l.noteKeptWork(cook.orderID)
 		if strings.EqualFold(strings.TrimSpace(cook.orderID), scheduleBootstrapOrderID) {
 			if l.ensureSkillFresh(scheduleOrderID) {
 				if err := l.mutateOrdersState(func(orders *OrdersFile) (bool, error) {

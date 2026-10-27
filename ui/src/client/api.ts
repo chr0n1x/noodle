@@ -10,7 +10,7 @@ import type {
 // Typed wrapper around res.json(). The Go API server is same-origin and
 // its JSON shapes are defined alongside the Go structs, so the cast is
 // an earned boundary assertion rather than a blind trust of unknown data.
-async function jsonBody<T>(res: Response): Promise<T> {
+export async function jsonBody<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }
 

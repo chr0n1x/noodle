@@ -37,7 +37,11 @@ func (l *Loop) atMaxConcurrency() bool {
 	if maxCooks <= 0 {
 		maxCooks = 1
 	}
-	return len(l.cooks.activeCooksByOrder)+len(l.cooks.adoptedTargets) >= maxCooks
+	active := len(l.cooks.activeCooksByOrder) + len(l.cooks.adoptedTargets)
+	if _, ok := l.cooks.activeCooksByOrder[scheduleOrderID]; ok && l.config.Concurrency.ExcludeScheduler {
+		active--
+	}
+	return active >= maxCooks
 }
 
 func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Order, opts spawnOptions) error {
@@ -55,7 +59,7 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 
 	name := cookBaseName(cand.OrderID, cand.StageIndex, stage.TaskKey)
 
-	created, err := l.ensureWorktree(name)
+	created, err := l.ensureWorktree(name, cand.OrderID)
 	if err != nil {
 		return fmt.Errorf("create worktree %s: %w", name, err)
 	}
@@ -78,7 +82,11 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 		}
 	}
 	prompt := buildCookPrompt(cand.OrderID, stage, order.Plan, order.Title, order.Rationale, resumePrompt)
+	if handled, err := l.holdExternalReview(cand, order, name, worktreePath, prompt); handled {
+		return err
+	}
 
+	prompt = skillWordingForProvider(prompt, nonEmpty(stage.Provider, l.config.Routing.Defaults.Provider), stage.Skill)
 	taskType, _ := l.registry.ByKey(stage.TaskKey)
 	req := loopruntime.DispatchRequest{
 		Name:         name,
@@ -208,6 +216,11 @@ func (l *Loop) handleCookDispatchFailure(cand dispatchCandidate, stage Stage, wo
 	}
 
 	reason := "dispatch failed: " + envelope.Error()
+	if isPublishStage(stage) {
+		return l.failPublishStage(&cookHandle{
+			cookIdentity: cookIdentity{orderID: cand.OrderID, stageIndex: cand.StageIndex, stage: stage},
+		}, reason)
+	}
 	if err := l.mutateOrdersState(func(orders *OrdersFile) (bool, error) {
 		updated, err := failStage(*orders, cand.OrderID, reason)
 		if err != nil {
@@ -267,7 +280,7 @@ func resetWorktreeState(worktreePath string) {
 	_ = clean.Run()
 }
 
-func (l *Loop) ensureWorktree(name string) (bool, error) {
+func (l *Loop) ensureWorktree(name, orderID string) (bool, error) {
 	path := l.worktreePath(name)
 	info, err := os.Stat(path)
 	if err == nil {
@@ -280,7 +293,11 @@ func (l *Loop) ensureWorktree(name string) (bool, error) {
 		return false, fmt.Errorf("stat worktree path %s: %w", path, err)
 	}
 
-	if err := l.deps.Worktree.Create(name); err != nil {
+	var opts worktree.CreateOpts
+	if ref, ok := l.orderWorkBranch(orderID); ok {
+		opts.From = ref
+	}
+	if err := l.deps.Worktree.Create(name, opts); err != nil {
 		if isWorktreeAlreadyExistsError(err) {
 			return false, nil
 		}

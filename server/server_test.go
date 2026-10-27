@@ -772,3 +772,32 @@ func assertFailureStateMessage(t *testing.T, message string) {
 		}
 	}
 }
+
+func TestGetControlAck(t *testing.T) {
+	s, dir := testServer(t)
+	lines := `{"id":"a","action":"pause","status":"ok","at":"2026-01-01T00:00:00Z"}
+{"id":"b","action":"draft-pr","status":"ok","message":"draft PR https://x/pull/1","at":"2026-01-01T00:00:00Z"}
+`
+	if err := os.WriteFile(filepath.Join(dir, "control-ack.ndjson"), []byte(lines), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	s.httpServer.Handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/control/b", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	var ack loop.ControlAck
+	if err := json.NewDecoder(w.Body).Decode(&ack); err != nil {
+		t.Fatal(err)
+	}
+	if ack.Action != "draft-pr" || ack.Message != "draft PR https://x/pull/1" {
+		t.Fatalf("ack = %+v", ack)
+	}
+
+	w = httptest.NewRecorder()
+	s.httpServer.Handler.ServeHTTP(w, httptest.NewRequest("GET", "/api/control/missing", nil))
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("pending status = %d, want 404", w.Code)
+	}
+}

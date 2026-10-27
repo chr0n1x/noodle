@@ -54,9 +54,12 @@ For git operations, `git -C` also works and doesn't need `exec`:
 
 ```bash
 git -C <project-root>/.worktrees/<name> status
-git -C <project-root>/.worktrees/<name> add -A
+git -C <project-root>/.worktrees/<name> add <each file you changed>
+git -C <project-root>/.worktrees/<name> diff --cached --stat
 git -C <project-root>/.worktrees/<name> commit -m "message"
 ```
+
+Stage only files you created or edited for this item, each by explicit path. Never stage a file just because it shows in `git status`. Never `add -A`, `add .`, `add *` or `commit -a`: tools write files into the worktree (caches, local databases) and those must not be committed. Before committing, read `diff --cached --stat` and unstage anything the backlog item did not ask you to change.
 
 File reads/edits use absolute paths directly — no `exec` needed.
 

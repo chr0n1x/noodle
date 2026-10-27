@@ -18,7 +18,6 @@ import (
 	"github.com/poteto/noodle/internal/stringx"
 	"github.com/poteto/noodle/loop"
 	"github.com/poteto/noodle/skill"
-	"github.com/poteto/noodle/worktree"
 )
 
 //go:embed placeholder.html
@@ -93,6 +92,7 @@ func New(opts Options) *Server {
 	mux.HandleFunc("GET /api/snapshot", s.handleSnapshot)
 	mux.HandleFunc("GET /api/sessions/{id}/events", s.handleSessionEvents)
 	mux.HandleFunc("POST /api/control", s.handleControl)
+	mux.HandleFunc("GET /api/control/{id}", s.handleControlAck)
 	mux.HandleFunc("GET /api/config", s.handleConfig)
 	mux.HandleFunc("GET /api/reviews/{id}/diff", s.handleReviewDiff)
 	mux.Handle("GET /", uiOrPlaceholder(opts.UI))
@@ -307,7 +307,7 @@ func (s *Server) handleReviewDiff(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "review not found", http.StatusNotFound)
 		return
 	}
-	result, err := worktree.DiffWorktree(found.WorktreePath)
+	result, err := s.diffWorktree(found.WorktreePath)
 	if err != nil {
 		// Worktree may have been cleaned up by a concurrent merge/reject.
 		if strings.Contains(err.Error(), "worktree path not found") {

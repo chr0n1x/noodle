@@ -12,7 +12,7 @@ import (
 )
 
 func TestClaudeControllerSteerableReturnsTrue(t *testing.T) {
-	ctrl := newClaudeController(&bytes.Buffer{})
+	ctrl := newClaudeController(&bytes.Buffer{}, false)
 	if !ctrl.Steerable() {
 		t.Fatal("Steerable() = false, want true")
 	}
@@ -20,7 +20,7 @@ func TestClaudeControllerSteerableReturnsTrue(t *testing.T) {
 
 func TestClaudeControllerSendMessageWritesJSONWhenIdle(t *testing.T) {
 	var buf bytes.Buffer
-	ctrl := newClaudeController(&buf)
+	ctrl := newClaudeController(&buf, false)
 
 	if err := ctrl.SendMessage(context.Background(), "hello world"); err != nil {
 		t.Fatalf("SendMessage: %v", err)
@@ -44,7 +44,7 @@ func TestClaudeControllerSendMessageWritesJSONWhenIdle(t *testing.T) {
 
 func TestClaudeControllerSendMessageWritesNewlineTerminated(t *testing.T) {
 	var buf bytes.Buffer
-	ctrl := newClaudeController(&buf)
+	ctrl := newClaudeController(&buf, false)
 
 	if err := ctrl.SendMessage(context.Background(), "test"); err != nil {
 		t.Fatalf("SendMessage: %v", err)
@@ -56,7 +56,7 @@ func TestClaudeControllerSendMessageWritesNewlineTerminated(t *testing.T) {
 }
 
 func TestClaudeControllerSendMessageTransitionsToActive(t *testing.T) {
-	ctrl := newClaudeController(&bytes.Buffer{})
+	ctrl := newClaudeController(&bytes.Buffer{}, false)
 
 	if err := ctrl.SendMessage(context.Background(), "go"); err != nil {
 		t.Fatalf("SendMessage: %v", err)
@@ -73,7 +73,7 @@ func TestClaudeControllerSendMessageTransitionsToActive(t *testing.T) {
 
 func TestClaudeControllerInterruptWritesControlRequest(t *testing.T) {
 	var buf bytes.Buffer
-	ctrl := newClaudeController(&buf)
+	ctrl := newClaudeController(&buf, false)
 
 	// Put controller into active state.
 	ctrl.mu.Lock()
@@ -115,7 +115,7 @@ func TestClaudeControllerInterruptWritesControlRequest(t *testing.T) {
 }
 
 func TestClaudeControllerInterruptTimesOut(t *testing.T) {
-	ctrl := newClaudeController(&bytes.Buffer{})
+	ctrl := newClaudeController(&bytes.Buffer{}, false)
 
 	// Put controller into active state with a turnDone that never closes.
 	ctrl.mu.Lock()
@@ -138,7 +138,7 @@ func TestClaudeControllerInterruptTimesOut(t *testing.T) {
 }
 
 func TestClaudeControllerInterruptWhenIdleIsNoop(t *testing.T) {
-	ctrl := newClaudeController(&bytes.Buffer{})
+	ctrl := newClaudeController(&bytes.Buffer{}, false)
 
 	if err := ctrl.Interrupt(context.Background()); err != nil {
 		t.Fatalf("Interrupt on idle controller: %v", err)
@@ -146,7 +146,7 @@ func TestClaudeControllerInterruptWhenIdleIsNoop(t *testing.T) {
 }
 
 func TestClaudeControllerNotifyEventInitTransitionsToActive(t *testing.T) {
-	ctrl := newClaudeController(&bytes.Buffer{})
+	ctrl := newClaudeController(&bytes.Buffer{}, false)
 
 	ctrl.NotifyEvent("init")
 
@@ -160,7 +160,7 @@ func TestClaudeControllerNotifyEventInitTransitionsToActive(t *testing.T) {
 }
 
 func TestClaudeControllerNotifyEventResultTransitionsToIdle(t *testing.T) {
-	ctrl := newClaudeController(&bytes.Buffer{})
+	ctrl := newClaudeController(&bytes.Buffer{}, false)
 
 	// Start active.
 	ctrl.mu.Lock()
@@ -181,7 +181,7 @@ func TestClaudeControllerNotifyEventResultTransitionsToIdle(t *testing.T) {
 
 func TestClaudeControllerSendMessageQueuesWhenActive(t *testing.T) {
 	var buf bytes.Buffer
-	ctrl := newClaudeController(&buf)
+	ctrl := newClaudeController(&buf, false)
 
 	// Send first message to become active.
 	if err := ctrl.SendMessage(context.Background(), "first"); err != nil {
@@ -228,7 +228,7 @@ func TestClaudeControllerSendMessageQueuesWhenActive(t *testing.T) {
 
 func TestClaudeControllerSerializesConcurrentOperations(t *testing.T) {
 	var buf safeBuffer
-	ctrl := newClaudeController(&buf)
+	ctrl := newClaudeController(&buf, false)
 
 	// Send first message to become active.
 	if err := ctrl.SendMessage(context.Background(), "first"); err != nil {
@@ -275,7 +275,7 @@ func TestProcessSessionControllerReturnsNoopWithoutController(t *testing.T) {
 }
 
 func TestProcessSessionControllerReturnsClaudeController(t *testing.T) {
-	cc := newClaudeController(&bytes.Buffer{})
+	cc := newClaudeController(&bytes.Buffer{}, false)
 	session := &processSession{controller: cc}
 	ctrl := session.Controller()
 	if !ctrl.Steerable() {
@@ -314,4 +314,62 @@ func (b *safeBuffer) Write(p []byte) (int, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.buf.Write(p)
+}
+
+type closeRecorder struct {
+	bytes.Buffer
+	closed bool
+}
+
+func (c *closeRecorder) Close() error {
+	c.closed = true
+	return nil
+}
+
+func TestClaudeControllerClosesStdinWhenTurnFinishes(t *testing.T) {
+	w := &closeRecorder{}
+	ctrl := newClaudeController(w, true)
+	if err := ctrl.SendMessage(context.Background(), "do the work"); err != nil {
+		t.Fatalf("SendMessage: %v", err)
+	}
+
+	ctrl.NotifyEvent("result")
+
+	if !w.closed {
+		t.Fatal("stdin still open after the turn finished; claude would wait for input forever")
+	}
+}
+
+func TestClaudeControllerKeepsStdinOpenAfterInterrupt(t *testing.T) {
+	w := &closeRecorder{}
+	ctrl := newClaudeController(w, true)
+	if err := ctrl.SendMessage(context.Background(), "do the work"); err != nil {
+		t.Fatalf("SendMessage: %v", err)
+	}
+
+	errs := make(chan error, 1)
+	go func() { errs <- ctrl.Interrupt(context.Background()) }()
+	time.Sleep(20 * time.Millisecond)
+	ctrl.NotifyEvent("result")
+	if err := <-errs; err != nil {
+		t.Fatalf("Interrupt: %v", err)
+	}
+
+	if w.closed {
+		t.Fatal("stdin closed after an interrupt; the steer message that follows would be lost")
+	}
+}
+
+func TestClaudeControllerKeepAliveKeepsStdinOpen(t *testing.T) {
+	w := &closeRecorder{}
+	ctrl := newClaudeController(w, false)
+	if err := ctrl.SendMessage(context.Background(), "schedule"); err != nil {
+		t.Fatalf("SendMessage: %v", err)
+	}
+
+	ctrl.NotifyEvent("result")
+
+	if w.closed {
+		t.Fatal("stdin closed for a keep-alive session")
+	}
 }

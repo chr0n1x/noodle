@@ -233,3 +233,18 @@ func TestProcessDefaultLimitAcceptsLineLargerThanOld16MiBCap(t *testing.T) {
 		t.Fatal("expected stamped output for large line")
 	}
 }
+
+func TestProcessLineToolProgressDoesNotEmitCanonicalRoutingError(t *testing.T) {
+	processor := NewProcessor()
+	line := []byte(`{"elapsed_time_seconds":30,"heartbeat":true,"parent_tool_use_id":"toolu_01UewHDmcm2vMg48ufBcVRbH","session_id":"76f9509c-20b3-4c66-ab6c-9ade9e495399","tool_name":"Bash","tool_use_id":"toolu_01UewHDmcm2vMg48ufBcVRbH-heartbeat-0","type":"tool_progress","uuid":"fb2e959c-a9c0-4830-bcc2-62c3348b0929"}`)
+	stamped, events, err := processor.ProcessLine(line)
+	if err != nil {
+		t.Fatalf("process line: %v", err)
+	}
+	if len(stamped) == 0 {
+		t.Fatal("expected stamped output")
+	}
+	if len(events) != 0 {
+		t.Fatalf("event count: got %d want 0: %+v", len(events), events)
+	}
+}

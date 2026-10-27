@@ -72,11 +72,33 @@ noodle event emit --session $NOODLE_SESSION_ID stage_yield --payload '{"message"
 
 Without this, the stage only completes on clean process exit — interrupted work is lost to the pipeline.
 
+### No change needed
+
+If verification shows the item already meets its done criteria without any code change, that is a valid result. `brain/principles/verification.md` defines what counts as verification. Do not make a commit to have something to show. Leave the worktree clean and yield with the evidence:
+
+```bash
+noodle event emit --session $NOODLE_SESSION_ID stage_yield --payload '{"message": "NO CHANGE NEEDED: <what you checked> passed at <short sha>. Logs: <paths>. Checked: <what you compared>."}'
+```
+
+Start your final reply with the same `NO CHANGE NEEDED:` line. The quality stage reviews that evidence instead of a diff.
+
+### Unverified
+
+Only when the commands in `brain/principles/verification.md` cannot run and that note allows an unverified result. Commit the change, then yield with the baseline evidence:
+
+```bash
+noodle event emit --session $NOODLE_SESSION_ID stage_yield --payload '{"message": "UNVERIFIED: <why verification could not run>. Baseline: <evidence of the failure>. Logs: <paths>. Change: <what and why it addresses the failure>."}'
+```
+
 ## Scope Discipline
 
 - Only change what's in scope. No defensive code, backwards-compat shims, or speculative features.
 - Out-of-scope discoveries go in the quality review notes — don't change them.
 - Wrong or incomplete plan/requirements: flag it in output, don't silently deviate.
+
+## Standing Permissions
+
+If `brain/principles/standing-permissions.md` exists, read it and treat it as holding for every backlog item, on top of the item's own scope. You don't need to ask for what it grants, and you must follow what it forbids. If the file does not exist, there are no standing permissions.
 
 ## Principles
 

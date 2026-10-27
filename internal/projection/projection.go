@@ -157,6 +157,7 @@ func projectOrders(s state.State) []OrderProjection {
 		orders = append(orders, OrderProjection{
 			ID:        order.OrderID,
 			Title:     order.Title,
+			URL:       order.Metadata["url"],
 			Plan:      append([]string(nil), order.Plan...),
 			Rationale: order.Rationale,
 			Stages:    projectStages(order.Stages),
@@ -312,6 +313,7 @@ func cloneOrderProjections(orders []OrderProjection) []OrderProjection {
 		cloned = append(cloned, OrderProjection{
 			ID:        order.ID,
 			Title:     order.Title,
+			URL:       order.URL,
 			Plan:      append([]string(nil), order.Plan...),
 			Rationale: order.Rationale,
 			Stages:    stageCopy,
@@ -370,6 +372,7 @@ func legacyOrdersFileProjection(bundle ProjectionBundle) orderx.OrdersFile {
 		orders = append(orders, orderx.Order{
 			ID:        order.ID,
 			Title:     order.Title,
+			URL:       order.URL,
 			Plan:      append([]string(nil), order.Plan...),
 			Rationale: order.Rationale,
 			Stages:    stages,
@@ -396,6 +399,8 @@ func legacyOrderStatus(status string) orderx.OrderStatus {
 	switch strings.TrimSpace(status) {
 	case "failed":
 		return orderx.OrderStatusFailed
+	case string(orderx.OrderStatusAwaitingPublish):
+		return orderx.OrderStatusAwaitingPublish
 	case "completed", "cancelled":
 		return orderx.OrderStatusCompleted
 	default:
@@ -413,7 +418,9 @@ func legacyStageStatus(status string) orderx.StageStatus {
 		return orderx.StageStatusCompleted
 	case "failed":
 		return orderx.StageStatusFailed
-	case "skipped", "cancelled":
+	case "skipped":
+		return orderx.StageStatusSkipped
+	case "cancelled":
 		return orderx.StageStatusCancelled
 	default:
 		return orderx.StageStatusPending

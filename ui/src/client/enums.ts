@@ -7,4 +7,4 @@ export type TraceFilter = "all" | "tools" | "think" | "ticket";
 
 // UI-only enums (no Go constants exist).
 export type StageStatus = "pending" | "active" | "merging" | "completed" | "failed" | "cancelled";
-export type OrderStatus = "active" | "completed" | "failed" | "failing";
+export type OrderStatus = "active" | "completed" | "failed" | "failing" | "awaiting-publish";

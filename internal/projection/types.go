@@ -38,6 +38,7 @@ type ProjectionBundle struct {
 type OrderProjection struct {
 	ID        string            `json:"id"`
 	Title     string            `json:"title,omitempty"`
+	URL       string            `json:"url,omitempty"`
 	Plan      []string          `json:"plan,omitempty"`
 	Rationale string            `json:"rationale,omitempty"`
 	Stages    []StageProjection `json:"stages"`

@@ -5,6 +5,7 @@ import { ActiveChannelProvider } from "~/client";
 import { connectWS } from "~/client/ws";
 import type { ChannelId } from "~/client";
 import { Sidebar } from "~/components/Sidebar";
+import { Toaster } from "~/components/Toaster";
 import "~/app.css";
 
 const queryClient = new QueryClient({
@@ -51,6 +52,7 @@ function RootComponent() {
           <Outlet />
         </div>
       </Suspense>
+      <Toaster />
     </ActiveChannelProvider>
   );
 }

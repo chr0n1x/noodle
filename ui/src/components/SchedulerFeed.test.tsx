@@ -1,22 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SchedulerFeed } from "./SchedulerFeed";
 import { buildSession, buildSnapshot } from "../test-utils";
-import type { Snapshot } from "~/client";
+import type { EventLine, Snapshot } from "~/client";
 
 const mockSend = vi.fn();
 let mockSnapshot: Snapshot = buildSnapshot();
+let mockControl: { mutate: typeof mockSend; isPending: boolean; variables?: unknown } = {
+  mutate: mockSend,
+  isPending: false,
+};
+let mockEvents: EventLine[] = [];
 
 vi.mock("~/client", async () => {
   const actual = await vi.importActual("~/client");
   return {
     ...(actual as Record<string, unknown>),
     useSuspenseSnapshot: () => ({ data: mockSnapshot }),
-    useSendControl: () => ({ mutate: mockSend, isPending: false }),
-    useSessionEvents: () => ({ data: [] }),
+    useSendControl: () => mockControl,
+    useSessionEvents: () => ({ data: mockEvents }),
   };
 });
+
+vi.mock("./Toaster", () => ({ toast: vi.fn() }));
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ to, children }: { to: string; children: React.ReactNode }) => (
@@ -24,9 +31,18 @@ vi.mock("@tanstack/react-router", () => ({
   ),
 }));
 
+const BUTTON_NAMES: Record<string, RegExp> = {
+  "Stop All": /^Stop All$/,
+  Stop: /^Stop(ping…)?$/,
+  "Mark Complete": /^(Mark Complete|Completing…)$/,
+  Send: /^Send$/,
+};
+
 beforeEach(() => {
   mockSnapshot = buildSnapshot();
-  mockSend.mockClear();
+  mockSend.mockReset();
+  mockControl = { mutate: mockSend, isPending: false };
+  mockEvents = [];
 });
 
 describe("SchedulerFeed", () => {
@@ -97,7 +113,7 @@ describe("SchedulerFeed", () => {
       action: "steer",
       target: "schedule",
       prompt: "deploy to staging",
-    });
+    }, expect.anything());
   });
 
   it("sends steer command on Enter", async () => {
@@ -109,7 +125,7 @@ describe("SchedulerFeed", () => {
       action: "steer",
       target: "schedule",
       prompt: "run tests",
-    });
+    }, expect.anything());
   });
 
   it("clears input after submit", async () => {
@@ -163,5 +179,74 @@ describe("SchedulerFeed", () => {
     render(<SchedulerFeed />);
     expect(screen.getByText("Talk to the scheduler...")).toBeInTheDocument();
     expect(screen.queryByText("Thinking…")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["stop-all", "Stop All"],
+    ["stop", "Stop"],
+    ["steer", "Send"],
+  ])("marks only the clicked %s button busy and disables all control buttons", (action, label) => {
+    const session = buildSession({ id: "scheduler-3", task_key: "schedule", current_action: "Think" });
+    mockSnapshot = buildSnapshot({ loop_state: "running", sessions: [session], active: [session] });
+    mockControl = { mutate: mockSend, isPending: true, variables: { action } };
+
+    render(<SchedulerFeed />);
+
+    for (const name of ["Stop All", "Stop", "Send"]) {
+      const button = screen.getByRole("button", { name: BUTTON_NAMES[name] });
+      expect(button).toBeDisabled();
+      expect(button.getAttribute("aria-busy")).toBe(name === label ? "true" : null);
+    }
+  });
+
+  it("sends Stop All through the reported path", async () => {
+    render(<SchedulerFeed />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Stop All" }));
+    expect(mockSend).toHaveBeenCalledWith({ action: "stop-all" }, expect.anything());
+  });
+
+  it("shows a sent steer as pending until delivered and its event arrives", async () => {
+    const session = buildSession({ id: "scheduler-4", task_key: "schedule", current_action: "" });
+    mockSnapshot = buildSnapshot({ loop_state: "running", sessions: [session] });
+    const view = render(<SchedulerFeed />);
+    const user = userEvent.setup();
+    await user.type(screen.getByPlaceholderText("Enter instructions or critique..."), "go faster{Enter}");
+
+    const steer = screen.getByTestId("pending-steer");
+    expect(steer).toHaveTextContent("go faster");
+    expect(steer).toHaveAttribute("data-state", "pending");
+    expect(steer).toHaveAttribute("aria-busy", "true");
+
+    const [, opts] = mockSend.mock.calls[0];
+    act(() => opts.onSuccess({ id: "c1", action: "steer", status: "ok", at: "" }));
+    expect(screen.getByTestId("pending-steer")).toHaveAttribute("data-state", "delivered");
+
+    mockEvents = [{ at: new Date().toISOString(), label: "User", body: "go faster", category: "all" }];
+    view.rerender(<SchedulerFeed />);
+    expect(screen.queryByTestId("pending-steer")).toBeNull();
+  });
+
+  it("keeps a failed steer visible with the error message", async () => {
+    render(<SchedulerFeed />);
+    await userEvent.setup().type(
+      screen.getByPlaceholderText("Enter instructions or critique..."),
+      "go faster{Enter}",
+    );
+
+    const [, opts] = mockSend.mock.calls[0];
+    act(() => opts.onError(new Error("noodle server unreachable")));
+
+    const steer = screen.getByTestId("pending-steer");
+    expect(steer).toHaveAttribute("data-state", "error");
+    expect(steer).not.toHaveAttribute("aria-busy", "true");
+    expect(steer).toHaveTextContent("noodle server unreachable");
+  });
+  it("shows the ack message and error for the clicked action", () => {
+    mockControl = { mutate: vi.fn(), isPending: false, isSuccess: true, isError: false, data: { id: "x", action: "stop-all", status: "ok", message: "stopped 2 sessions", at: "" }, variables: { action: "stop-all" }, reset: vi.fn() } as never;
+    const view = render(<SchedulerFeed />);
+    expect(screen.getByRole("status")).toHaveTextContent("Stop All: stopped 2 sessions");
+    mockControl = { mutate: vi.fn(), isPending: false, isSuccess: false, isError: true, error: new Error("noodle server unreachable"), variables: { action: "steer" }, reset: vi.fn() } as never;
+    view.rerender(<SchedulerFeed />);
+    expect(screen.getAllByRole("alert").map((e) => e.textContent)).toContain("Send: noodle server unreachableDismiss");
   });
 });

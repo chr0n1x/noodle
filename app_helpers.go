@@ -49,8 +49,9 @@ func (a *App) ProviderConfigs() dispatcher.ProviderConfigs {
 	}
 	return dispatcher.ProviderConfigs{
 		Claude: dispatcher.ProviderConfig{
-			Path: a.Config.Agents.Claude.Path,
-			Args: a.Config.Agents.Claude.Args,
+			Path:          a.Config.Agents.Claude.Path,
+			Args:          a.Config.Agents.Claude.Args,
+			ExitAfterTurn: a.Config.Agents.Claude.ExitAfterTurn,
 		},
 		Codex: dispatcher.ProviderConfig{
 			Path: a.Config.Agents.Codex.Path,

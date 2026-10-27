@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -33,7 +34,7 @@ func consumeOrdersNextAndPersist(t *testing.T, nextPath, ordersPath string) merg
 	if err != nil {
 		t.Fatalf("read existing orders: %v", err)
 	}
-	result, err := consumeOrdersNext(nextPath, existing)
+	result, err := consumeOrdersNext(nextPath, existing, nil)
 	if err != nil {
 		t.Fatalf("consumeOrdersNext: %v", err)
 	}
@@ -200,7 +201,7 @@ func TestConsumeOrdersNextMissingReturnsNoop(t *testing.T) {
 	dir := t.TempDir()
 	nextPath := filepath.Join(dir, "orders-next.json")
 
-	result, err := consumeOrdersNext(nextPath, orderx.OrdersFile{})
+	result, err := consumeOrdersNext(nextPath, orderx.OrdersFile{}, nil)
 	if err != nil {
 		t.Fatalf("consumeOrdersNext: %v", err)
 	}
@@ -366,14 +367,22 @@ func TestConsumeOrdersNextDuplicateActiveIDAmendsPendingTail(t *testing.T) {
 		t.Fatalf("expected 1 order, got %d", len(got.Orders))
 	}
 	stages := got.Orders[0].Stages
-	if len(stages) != 2 {
-		t.Fatalf("expected 2 stages after amendment, got %d", len(stages))
+	want := []struct {
+		key    string
+		status orderx.StageStatus
+	}{
+		{"execute", orderx.StageStatusActive},
+		{"adversarial-review", orderx.StageStatusPending},
+		{"quality", orderx.StageStatusSkipped},
+		{"reflect", orderx.StageStatusSkipped},
 	}
-	if stages[0].TaskKey != "execute" || stages[0].Status != orderx.StageStatusActive {
-		t.Fatalf("stage[0] = %+v, want active execute", stages[0])
+	if len(stages) != len(want) {
+		t.Fatalf("expected %d stages after amendment, got %d: %+v", len(want), len(stages), stages)
 	}
-	if stages[1].TaskKey != "adversarial-review" || stages[1].Status != orderx.StageStatusPending {
-		t.Fatalf("stage[1] = %+v, want pending adversarial-review", stages[1])
+	for i, w := range want {
+		if stages[i].TaskKey != w.key || stages[i].Status != w.status {
+			t.Fatalf("stage[%d] = %s/%s, want %s/%s", i, stages[i].TaskKey, stages[i].Status, w.key, w.status)
+		}
 	}
 }
 
@@ -421,14 +430,120 @@ func TestConsumeOrdersNextDuplicateActiveIDAmendsCurrentStage(t *testing.T) {
 		t.Fatalf("expected 1 order, got %d", len(got.Orders))
 	}
 	stages := got.Orders[0].Stages
-	if len(stages) != 2 {
-		t.Fatalf("expected 2 stages after amendment, got %d", len(stages))
+	if len(stages) != 3 {
+		t.Fatalf("expected 3 stages after amendment, got %d: %+v", len(stages), stages)
 	}
 	if stages[0].TaskKey != "execute" || stages[0].Prompt != "new prompt" || stages[0].Status != orderx.StageStatusPending {
 		t.Fatalf("stage[0] = %+v, want pending amended execute stage", stages[0])
 	}
 	if stages[1].TaskKey != "adversarial-review" || stages[1].Status != orderx.StageStatusPending {
 		t.Fatalf("stage[1] = %+v, want pending adversarial-review", stages[1])
+	}
+	if stages[2].TaskKey != "quality" || stages[2].Status != orderx.StageStatusSkipped {
+		t.Fatalf("stage[2] = %+v, want skipped quality", stages[2])
+	}
+}
+
+func TestConsumeOrdersNextAmendKeepsParkedCurrentStage(t *testing.T) {
+	dir := t.TempDir()
+	nextPath := filepath.Join(dir, "orders-next.json")
+
+	existing := orderx.OrdersFile{
+		Orders: []orderx.Order{
+			{
+				ID:     "8",
+				Title:  "existing order",
+				Status: orderx.OrderStatusActive,
+				Stages: []orderx.Stage{
+					{TaskKey: "execute", Skill: "execute", Provider: "claude", Model: "sonnet", Status: orderx.StageStatusCompleted},
+					{TaskKey: "quality", Skill: "quality", Provider: "claude", Model: "sonnet", Status: orderx.StageStatusActive},
+					{TaskKey: "adversarial-review", Skill: "adversarial-review", Provider: "claude", Model: "sonnet", Status: orderx.StageStatusPending},
+				},
+			},
+		},
+	}
+
+	writeCompactOrders(t, nextPath, orderx.CompactOrdersFile{
+		Orders: []orderx.CompactOrder{
+			{ID: "8", Title: "rescheduled order", Stages: []orderx.CompactStage{
+				{Do: "execute", With: "claude", Model: "sonnet"},
+			}},
+		},
+	})
+
+	result, err := consumeOrdersNext(nextPath, existing, []string{"adversarial-review"})
+	if err != nil {
+		t.Fatalf("consumeOrdersNext: %v", err)
+	}
+	stages := result.Orders.Orders[0].Stages
+	want := []struct {
+		key    string
+		status orderx.StageStatus
+	}{
+		{"execute", orderx.StageStatusCompleted},
+		{"quality", orderx.StageStatusActive},
+		{"adversarial-review", orderx.StageStatusPending},
+	}
+	if len(stages) != len(want) {
+		t.Fatalf("expected %d stages, got %d: %+v", len(want), len(stages), stages)
+	}
+	for i, w := range want {
+		if stages[i].TaskKey != w.key || stages[i].Status != w.status {
+			t.Fatalf("stage[%d] = %s/%s, want %s/%s", i, stages[i].TaskKey, stages[i].Status, w.key, w.status)
+		}
+	}
+}
+
+func TestConsumeOrdersNextAmendKeepsExtraStagesPastQuality(t *testing.T) {
+	dir := t.TempDir()
+	nextPath := filepath.Join(dir, "orders-next.json")
+
+	existing := orderx.OrdersFile{
+		Orders: []orderx.Order{
+			{
+				ID:     "7",
+				Title:  "existing order",
+				Status: orderx.OrderStatusActive,
+				Stages: []orderx.Stage{
+					{TaskKey: "execute", Skill: "execute", Provider: "claude", Model: "sonnet", Status: orderx.StageStatusCompleted},
+					{TaskKey: "quality", Skill: "quality", Provider: "claude", Model: "sonnet", Status: orderx.StageStatusCompleted},
+					{TaskKey: "adversarial-review", Skill: "adversarial-review", Provider: "claude", Model: "sonnet", Status: orderx.StageStatusActive},
+					{TaskKey: "reflect", Skill: "reflect", Provider: "claude", Model: "sonnet", Status: orderx.StageStatusPending},
+				},
+			},
+		},
+	}
+
+	writeCompactOrders(t, nextPath, orderx.CompactOrdersFile{
+		Orders: []orderx.CompactOrder{
+			{ID: "7", Title: "rescheduled order", Stages: []orderx.CompactStage{
+				{Do: "execute", With: "claude", Model: "sonnet"},
+				{Do: "quality", With: "claude", Model: "sonnet"},
+			}},
+		},
+	})
+
+	result, err := consumeOrdersNext(nextPath, existing, []string{"adversarial-review", "reflect"})
+	if err != nil {
+		t.Fatalf("consumeOrdersNext: %v", err)
+	}
+	stages := result.Orders.Orders[0].Stages
+	want := []struct {
+		key    string
+		status orderx.StageStatus
+	}{
+		{"execute", orderx.StageStatusCompleted},
+		{"quality", orderx.StageStatusCompleted},
+		{"adversarial-review", orderx.StageStatusActive},
+		{"reflect", orderx.StageStatusPending},
+	}
+	if len(stages) != len(want) {
+		t.Fatalf("expected %d stages, got %d: %+v", len(want), len(stages), stages)
+	}
+	for i, w := range want {
+		if stages[i].TaskKey != w.key || stages[i].Status != w.status {
+			t.Fatalf("stage[%d] = %s/%s, want %s/%s", i, stages[i].TaskKey, stages[i].Status, w.key, w.status)
+		}
 	}
 }
 
@@ -492,7 +607,7 @@ func TestConsumeOrdersNextInvalidNextJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := consumeOrdersNext(nextPath, orderx.OrdersFile{})
+	result, err := consumeOrdersNext(nextPath, orderx.OrdersFile{}, nil)
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
 	}
@@ -1097,5 +1212,37 @@ func TestOrdersFileCloneRoundTrip(t *testing.T) {
 	}
 	if string(s.Extra["key"]) != `"value"` {
 		t.Errorf("Extra lost in clone round-trip")
+	}
+}
+
+func TestConsumeOrdersNextReportsOrderIDsByOutcome(t *testing.T) {
+	dir := t.TempDir()
+	nextPath := filepath.Join(dir, "orders-next.json")
+	existing := orderx.OrdersFile{Orders: []orderx.Order{
+		{ID: "4", Status: orderx.OrderStatusActive, Stages: []orderx.Stage{{TaskKey: "execute", Provider: "claude", Model: "claude-opus-4-6", Status: orderx.StageStatusActive}}},
+		{ID: "9", Status: orderx.OrderStatusFailed, Stages: []orderx.Stage{{TaskKey: "execute", Provider: "claude", Model: "claude-opus-4-6", Status: orderx.StageStatusFailed}}},
+	}}
+	writeCompactOrders(t, nextPath, orderx.CompactOrdersFile{Orders: []orderx.CompactOrder{
+		{ID: "4", Stages: []orderx.CompactStage{{Do: "execute", With: "claude", Model: "claude-opus-4-6"}}},
+		{ID: "9", Stages: []orderx.CompactStage{{Do: "execute", With: "claude", Model: "claude-opus-4-6"}}},
+		{ID: "10", Stages: []orderx.CompactStage{{Do: "execute", With: "claude", Model: "claude-opus-4-6"}}},
+		{ID: "10", Stages: []orderx.CompactStage{{Do: "execute", With: "claude", Model: "claude-opus-4-6"}}},
+	}})
+
+	result, err := consumeOrdersNext(nextPath, existing, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := result.Added, []string{"10"}; !slices.Equal(got, want) {
+		t.Errorf("Added = %v, want %v", got, want)
+	}
+	if got, want := result.Replaced, []string{"9"}; !slices.Equal(got, want) {
+		t.Errorf("Replaced = %v, want %v", got, want)
+	}
+	if got, want := result.Amended, []string{"4"}; !slices.Equal(got, want) {
+		t.Errorf("Amended = %v, want %v", got, want)
+	}
+	if got, want := result.Unchanged, []string{"10"}; !slices.Equal(got, want) {
+		t.Errorf("Unchanged = %v, want %v", got, want)
 	}
 }

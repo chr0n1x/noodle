@@ -21,6 +21,9 @@ type Config struct {
 	Agents      AgentsConfig             `toml:"agents"`
 	Runtime     RuntimeConfig            `toml:"runtime"`
 	Server      ServerConfig             `toml:"server"`
+	Worktree    WorktreeConfig           `toml:"worktree"`
+	Delivery    DeliveryConfig           `toml:"delivery"`
+	Review      ReviewConfig             `toml:"review"`
 }
 
 type AdapterConfig struct {
@@ -43,11 +46,17 @@ type SkillsConfig struct {
 
 type ConcurrencyConfig struct {
 	MaxConcurrency int `toml:"max_concurrency"`
+	// ExcludeScheduler leaves the scheduler session out of the
+	// max_concurrency count.
+	ExcludeScheduler bool `toml:"exclude_scheduler"`
 }
 
 type ProviderConfig struct {
 	Path string   `toml:"path"`
 	Args []string `toml:"args"`
+	// ExitAfterTurn closes a work agent's stdin when its turn finishes so
+	// the process exits and the stage completes.
+	ExitAfterTurn bool `toml:"exit_after_turn"`
 }
 
 type AgentsConfig struct {

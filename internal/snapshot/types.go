@@ -50,11 +50,13 @@ type Snapshot struct {
 	FeedEvents      []FeedEvent            `json:"feed_events"`
 	TotalCostUSD    float64                `json:"total_cost_usd"`
 
-	PendingReviews     []loop.PendingReviewItem `json:"pending_reviews"`
-	PendingReviewCount int                      `json:"pending_review_count"`
-	Mode               string                   `json:"mode"`
-	MaxConcurrency     int                      `json:"max_concurrency"`
-	Warnings           []string                 `json:"warnings"`
+	PendingReviews     []loop.PendingReviewItem    `json:"pending_reviews"`
+	PendingReviewCount int                         `json:"pending_review_count"`
+	Mode               string                      `json:"mode"`
+	MaxConcurrency     int                         `json:"max_concurrency"`
+	Warnings           []string                    `json:"warnings"`
+	DraftPR            bool                        `json:"draft_pr"`
+	DraftPRs           map[string]loop.DraftPRLink `json:"draft_prs"`
 }
 
 // Session represents a single agent session.
@@ -83,12 +85,21 @@ type Session struct {
 
 // Order is a pipeline of stages in the snapshot.
 type Order struct {
-	ID        string   `json:"id"`
-	Title     string   `json:"title,omitempty"`
+	ID    string `json:"id"`
+	Title string `json:"title,omitempty"`
+	// URL links the order to its source (a ticket or pull request); it is
+	// empty when the scheduler had no well-formed http(s) link for it.
+	URL       string   `json:"url,omitempty"`
 	Plan      []string `json:"plan,omitempty"`
 	Rationale string   `json:"rationale,omitempty"`
 	Stages    []Stage  `json:"stages"`
 	Status    string   `json:"status"`
+	// PublishGated, PublishBlockedReason and PublishError are set only when
+	// the config gates publishing; an empty reason means approve-and-publish
+	// would be accepted.
+	PublishGated         bool   `json:"publish_gated,omitempty"`
+	PublishBlockedReason string `json:"publish_blocked_reason,omitempty"`
+	PublishError         string `json:"publish_error,omitempty"`
 }
 
 // Stage is a unit of work within an order in the snapshot.

@@ -20,7 +20,7 @@ func TestParkPendingReviewWritesFile(t *testing.T) {
 	}
 	ordersPath := filepath.Join(runtimeDir, "orders.json")
 	if err := writeOrdersAtomic(ordersPath, OrdersFile{Orders: []Order{
-		{ID: "42", Status: OrderStatusActive, Stages: []Stage{{TaskKey: "execute", Skill: "execute", Provider: "claude", Model: "claude-opus-4-6", Status: StageStatusActive}}},
+		{ID: "42", Title: "PROJ-125: retry flaky upload", Status: OrderStatusActive, Stages: []Stage{{TaskKey: "execute", Skill: "execute", Provider: "claude", Model: "claude-opus-4-6", Status: StageStatusActive}}},
 	}}); err != nil {
 		t.Fatalf("write orders: %v", err)
 	}
@@ -57,6 +57,9 @@ func TestParkPendingReviewWritesFile(t *testing.T) {
 	}
 	if items[0].SessionID != "sess-42" {
 		t.Fatalf("session id = %q, want sess-42", items[0].SessionID)
+	}
+	if items[0].Title != "PROJ-125: retry flaky upload" {
+		t.Fatalf("title = %q, want the order title", items[0].Title)
 	}
 }
 

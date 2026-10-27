@@ -11,7 +11,7 @@ const (
 
 // Known field keys — used to separate known from extra fields during unmarshal.
 var knownBacklogKeys = map[string]bool{
-	"id": true, "title": true, "status": true, "plan": true,
+	"id": true, "title": true, "status": true, "plan": true, "url": true,
 }
 
 type BacklogItem struct {
@@ -19,6 +19,7 @@ type BacklogItem struct {
 	Title  string         `json:"title"`
 	Status string         `json:"status,omitempty"`
 	Plan   string         `json:"plan,omitempty"`
+	URL    string         `json:"url,omitempty"`
 	Extra  map[string]any `json:"-"`
 }
 

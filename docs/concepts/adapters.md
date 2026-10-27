@@ -69,8 +69,9 @@ Only `id` and `title` are required. Everything else — any field, any type — 
 | `title`  | string | yes      | item title                         |
 | `status` | string | no       | used by Noodle to filter done items |
 | `plan`   | string | no       | used by Noodle to read plan files  |
+| `url`    | string | no       | link to the item's source; the scheduler copies it onto the order so the title links there |
 
-`status` and `plan` are the only optional fields Noodle interprets. All other fields (e.g. `tags`, `section`, `estimate`, `priority`, or anything your system tracks) are passed through as-is. The scheduler sees them in mise.json and can use them for context, but Noodle itself doesn't act on them.
+`status`, `plan` and `url` are the only optional fields Noodle interprets. The default `backlog-sync` reads `url` from a `[url: https://...]` marker on the item line and removes the marker from the title. An order keeps a `url` only when it is an absolute `http` or `https` address; anything else leaves a plain title. All other fields (e.g. `tags`, `section`, `estimate`, `priority`, or anything your system tracks) are passed through as-is. The scheduler sees them in mise.json and can use them for context, but Noodle itself doesn't act on them.
 
 ### `done`
 

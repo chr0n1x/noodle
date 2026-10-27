@@ -31,6 +31,7 @@ func (l *Loop) drainMergeResults(ctx context.Context) error {
 			}); err != nil {
 				return err
 			}
+			l.releaseOrderWork(cook.orderID)
 			if err := l.advanceAndPersist(ctx, cook); err != nil {
 				return err
 			}

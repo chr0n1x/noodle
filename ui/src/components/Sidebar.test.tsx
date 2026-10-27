@@ -17,6 +17,7 @@ vi.mock("~/client", async () => {
     ...(actual as object),
     useSuspenseSnapshot: () => ({ data: mockSnapshot }),
     useWSStatus: () => "connected" as const,
+    useSendControl: () => ({ mutate: vi.fn(), isPending: false }),
     useActiveChannel: () => ({
       activeChannel: mockActiveChannel,
       setActiveChannel: mockSetActiveChannel,
@@ -79,6 +80,42 @@ describe("Sidebar", () => {
     });
     render(<Sidebar />);
     expect(screen.getByText("Fix auth bug")).toBeInTheDocument();
+  });
+
+  it("links an order to its source url", () => {
+    mockSnapshot = buildSnapshot({
+      orders: [
+        buildOrder({
+          id: "9",
+          title: "PROJ-123 fix login bug",
+          url: "https://jira.example.com/browse/PROJ-123",
+          stages: [buildStage({})],
+        }),
+        buildOrder({
+          id: "10",
+          title: "No source",
+          url: "data:text/html,hi",
+          stages: [buildStage({})],
+        }),
+      ],
+    });
+    render(<Sidebar />);
+    const links = screen.getAllByRole("link", { name: /jira\.example\.com PROJ-123/ });
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute("href", "https://jira.example.com/browse/PROJ-123");
+    expect(screen.queryByRole("link", { name: /data:/ })).not.toBeInTheDocument();
+  });
+
+  it("links orders that have a draft PR", () => {
+    mockSnapshot = buildSnapshot({
+      orders: [buildOrder({ id: "1", title: "Fix auth bug", stages: [buildStage({})] })],
+      draft_prs: { "1": { branch: "noodle/1", url: "https://github.com/a/b/pull/2" } },
+    });
+    render(<Sidebar />);
+    expect(screen.getByRole("link", { name: /PR #2/ })).toHaveAttribute(
+      "href",
+      "https://github.com/a/b/pull/2",
+    );
   });
 
   it("renders repeated stage signatures as distinct indexed labels", async () => {
@@ -254,5 +291,59 @@ describe("Sidebar", () => {
     const avatar = container.querySelector(".agent-avatar");
     expect(avatar).toBeTruthy();
     expect(avatar?.textContent).toBe("S");
+  });
+
+  it("shows an awaiting publish badge on awaiting-publish orders", () => {
+    mockSnapshot = buildSnapshot({
+      orders: [
+        buildOrder({
+          id: "o-1",
+          title: "Waiting",
+          status: "awaiting-publish",
+          stages: [buildStage({ status: "completed" })],
+        }),
+        buildOrder({ id: "o-2", title: "Running", status: "active" }),
+      ],
+    });
+    render(<Sidebar />);
+    expect(screen.getAllByText("awaiting publish")).toHaveLength(1);
+  });
+
+  it("shows Approve & Publish only for gated orders", () => {
+    mockSnapshot = buildSnapshot({
+      orders: [buildOrder({ id: "o-1", title: "Ungated", status: "active" })],
+    });
+    const { unmount } = render(<Sidebar />);
+    expect(screen.queryByRole("button", { name: "Approve & Publish" })).not.toBeInTheDocument();
+    unmount();
+
+    mockSnapshot = buildSnapshot({
+      orders: [
+        buildOrder({ id: "o-1", title: "Gated", status: "awaiting-publish", publish_gated: true }),
+      ],
+    });
+    render(<Sidebar />);
+    expect(screen.getByRole("button", { name: "Approve & Publish" })).toBeEnabled();
+  });
+
+  it("draws cancelled (skipped) stages dimmed, not as pending", async () => {
+    mockSnapshot = buildSnapshot({
+      orders: [
+        buildOrder({
+          id: "order-skip",
+          title: "Skipped stages order",
+          status: "active",
+          stages: [
+            buildStage({ status: "completed", task_key: "execute" }),
+            buildStage({ status: "cancelled", task_key: "quality" }),
+          ],
+        }),
+      ],
+    });
+    render(<Sidebar />);
+    await userEvent.setup().click(screen.getByText("Skipped stages order"));
+    const stage = screen.getByText("quality 2").closest(".tree-stage");
+    expect(stage).toHaveClass("stage-skipped");
+    expect(stage).not.toHaveClass("stage-pending");
   });
 });

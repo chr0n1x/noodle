@@ -39,14 +39,19 @@ type claudeController struct {
 
 	// pendingPrompt holds a queued message to send after the current turn.
 	pendingPrompt string
+
+	// closeOnIdle closes stdin when a turn finishes on its own with nothing
+	// queued, so claude exits and the stage completes.
+	closeOnIdle bool
 }
 
 // newClaudeController creates a controller wrapping the process's stdin writer.
-func newClaudeController(stdin io.Writer) *claudeController {
+func newClaudeController(stdin io.Writer, closeOnIdle bool) *claudeController {
 	return &claudeController{
-		w:        stdin,
-		state:    turnIdle,
-		turnDone: make(chan struct{}),
+		w:           stdin,
+		state:       turnIdle,
+		turnDone:    make(chan struct{}),
+		closeOnIdle: closeOnIdle,
 	}
 }
 
@@ -154,9 +159,15 @@ func (c *claudeController) NotifyEvent(eventType string) {
 
 	case "result":
 		if c.state == turnActive || c.state == turnInterrupting {
+			finished := c.state == turnActive
 			c.state = turnIdle
 			close(c.turnDone)
 			c.drainPending()
+			if finished && c.closeOnIdle && c.state == turnIdle {
+				if closer, ok := c.w.(io.Closer); ok {
+					_ = closer.Close()
+				}
+			}
 		}
 	}
 }

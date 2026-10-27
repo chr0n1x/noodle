@@ -90,6 +90,44 @@ func TestPlanDispatches(t *testing.T) {
 			wantRemaining: 1,
 		},
 		{
+			name: "parked review stages block their order but use no capacity",
+			input: state.State{
+				Orders: map[string]state.OrderNode{
+					"order-a": {
+						OrderID: "order-a",
+						Status:  state.OrderActive,
+						Stages: []state.StageNode{
+							{StageIndex: 0, Status: state.StageReview},
+							{StageIndex: 1, Status: state.StagePending},
+						},
+					},
+					"order-b": {
+						OrderID: "order-b",
+						Status:  state.OrderActive,
+						Stages: []state.StageNode{
+							{StageIndex: 0, Status: state.StageReview},
+						},
+					},
+					"order-c": {
+						OrderID: "order-c",
+						Status:  state.OrderActive,
+						Stages: []state.StageNode{
+							{StageIndex: 0, Status: state.StagePending},
+						},
+					},
+				},
+			},
+			maxConcurrent: 1,
+			wantCand: []DispatchCandidate{
+				{OrderID: "order-c", StageIndex: 0, Runtime: "process"},
+			},
+			wantBlocked: []BlockedCandidate{
+				{OrderID: "order-a", StageIndex: 1, Reason: "busy"},
+				{OrderID: "order-b", StageIndex: -1, Reason: "no pending stage"},
+			},
+			wantRemaining: 0,
+		},
+		{
 			name: "blocks failed orders from canonical status",
 			input: state.State{
 				Orders: map[string]state.OrderNode{

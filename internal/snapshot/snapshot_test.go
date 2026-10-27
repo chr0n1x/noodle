@@ -641,3 +641,19 @@ func TestLoadSnapshotNilSlicesMarshalAsEmptyArrays(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadSnapshotIncludesDraftPRs(t *testing.T) {
+	dir := t.TempDir()
+	record := `{"1":{"branch":"noodle/1","url":"https://github.com/acme/widgets/pull/2"}}`
+	if err := os.WriteFile(filepath.Join(dir, "draft-prs.json"), []byte(record), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	snap, err := LoadSnapshot(dir, time.Now(), loop.LoopState{Status: "running"})
+	if err != nil {
+		t.Fatalf("LoadSnapshot: %v", err)
+	}
+	got := snap.DraftPRs["1"]
+	if got.URL != "https://github.com/acme/widgets/pull/2" || got.Branch != "noodle/1" {
+		t.Fatalf("draft_prs[1] = %+v", got)
+	}
+}

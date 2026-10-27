@@ -34,8 +34,10 @@ while IFS= read -r line || [ -n "$line" ]; do
 
     plan=$(printf '%s\n' "$raw" | sed -nE 's/.*\[\[plans\/([0-9]+-[^/]+)\/overview\]\].*/brain\/plans\/\1\/overview.md/p' | head -n1)
 
+    url=$(printf '%s\n' "$raw" | sed -nE 's/.*\[url:[[:space:]]*([^][:space:]]+)[[:space:]]*\].*/\1/p' | head -n1)
+
     title=$(printf '%s\n' "$raw" \
-      | sed -E 's/#[A-Za-z0-9_-]+//g; s/~(small|medium|large)//g; s/\[\[plans\/[^]]+\]\]//g; s/[[:space:]]+/ /g; s/^[[:space:]]*//; s/[[:space:]]*$//')
+      | sed -E 's/#[A-Za-z0-9_-]+//g; s/~(small|medium|large)//g; s/\[\[plans\/[^]]+\]\]//g; s/\[url:[^]]*\]//g; s/[[:space:]]+/ /g; s/^[[:space:]]*//; s/[[:space:]]*$//')
 
     printf '{"id":"%s","title":"%s","status":"%s"' \
       "$(json_escape "$id")" "$(json_escape "$title")" "$status"
@@ -65,6 +67,10 @@ while IFS= read -r line || [ -n "$line" ]; do
 
     if [ -n "$plan" ]; then
       printf ',"plan":"%s"' "$(json_escape "$plan")"
+    fi
+
+    if [ -n "$url" ]; then
+      printf ',"url":"%s"' "$(json_escape "$url")"
     fi
 
     printf '}\n'

@@ -21,6 +21,11 @@ func TestCLIIntegrationStartScaffolds(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
+	// The UI build needs pnpm; without it the binary cannot embed ui/dist/client.
+	if _, err := exec.LookPath("pnpm"); err != nil {
+		t.Skipf("skipping integration test: pnpm not found on PATH (%v)", err)
+	}
+
 	// Build UI assets then the binary
 	projectRoot := findProjectRoot(t)
 	uiBuild := exec.Command("pnpm", "--filter", "noodle-ui", "build")

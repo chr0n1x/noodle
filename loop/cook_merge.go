@@ -58,10 +58,11 @@ func (l *Loop) resolveMergeMode(cook *cookHandle) (mode string, branch string) {
 
 func (l *Loop) mergeLifecyclePayload(cook *cookHandle, mergeable bool) map[string]any {
 	payload := map[string]any{
-		"order_id":      cook.orderID,
-		"stage_index":   cook.stageIndex,
-		"worktree_name": cook.worktreeName,
-		"mergeable":     mergeable,
+		"order_id":         cook.orderID,
+		"stage_index":      cook.stageIndex,
+		"worktree_name":    cook.worktreeName,
+		"mergeable":        mergeable,
+		"hold_for_publish": l.orderGated() && !isPublishStage(cook.stage),
 	}
 	if !mergeable {
 		return payload

@@ -16,15 +16,17 @@ const (
 	StageStatusCompleted StageStatus = "completed"
 	StageStatusFailed    StageStatus = "failed"
 	StageStatusCancelled StageStatus = "cancelled"
+	StageStatusSkipped   StageStatus = "skipped"
 )
 
 // OrderStatus is the lifecycle status of an order.
 type OrderStatus string
 
 const (
-	OrderStatusActive    OrderStatus = "active"
-	OrderStatusCompleted OrderStatus = "completed"
-	OrderStatusFailed    OrderStatus = "failed"
+	OrderStatusActive          OrderStatus = "active"
+	OrderStatusCompleted       OrderStatus = "completed"
+	OrderStatusFailed          OrderStatus = "failed"
+	OrderStatusAwaitingPublish OrderStatus = "awaiting-publish"
 )
 
 // Stage is a unit of work within an order (serialization type).
@@ -45,6 +47,7 @@ type Stage struct {
 type Order struct {
 	ID        string      `json:"id"`
 	Title     string      `json:"title,omitempty"`
+	URL       string      `json:"url,omitempty"`
 	Plan      []string    `json:"plan,omitempty"`
 	Rationale string      `json:"rationale,omitempty"`
 	Stages    []Stage     `json:"stages"`
@@ -84,7 +87,7 @@ func (o Order) StagesInGroup(group int) []int {
 // ValidateOrderStatus returns an error if the order status is not valid.
 func ValidateOrderStatus(status OrderStatus) error {
 	switch status {
-	case OrderStatusActive, OrderStatusCompleted, OrderStatusFailed:
+	case OrderStatusActive, OrderStatusCompleted, OrderStatusFailed, OrderStatusAwaitingPublish:
 		return nil
 	case "":
 		return fmt.Errorf("order status is required")
@@ -96,7 +99,7 @@ func ValidateOrderStatus(status OrderStatus) error {
 // ValidateStageStatus returns an error if the stage status is not valid.
 func ValidateStageStatus(status StageStatus) error {
 	switch status {
-	case StageStatusPending, StageStatusActive, StageStatusMerging, StageStatusCompleted, StageStatusFailed, StageStatusCancelled:
+	case StageStatusPending, StageStatusActive, StageStatusMerging, StageStatusCompleted, StageStatusFailed, StageStatusCancelled, StageStatusSkipped:
 		return nil
 	case "":
 		return fmt.Errorf("stage status is required")

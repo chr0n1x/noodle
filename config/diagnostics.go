@@ -136,6 +136,7 @@ func Validate(config Config) ValidationResult {
 		}
 	}
 
+	result.Diagnostics = append(result.Diagnostics, forkDiagnostics(config)...)
 	return result
 }
 

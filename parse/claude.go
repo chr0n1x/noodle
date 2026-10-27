@@ -143,7 +143,7 @@ func (ClaudeAdapter) Parse(line []byte) ([]CanonicalEvent, error) {
 		// Transport-control response from Claude stream. Do not emit
 		// canonical activity for this line type.
 		return nil, nil
-	case "rate_limit_event":
+	case "rate_limit_event", "tool_progress":
 		// Informational transport event. Route as Claude so it doesn't surface
 		// as a canonical routing error, but don't emit canonical activity.
 		return nil, nil

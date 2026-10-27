@@ -121,7 +121,7 @@ func advanceOrder(orders OrdersFile, orderID string) (OrdersFile, bool, error) {
 	// Check if all stages are completed.
 	allDone := true
 	for _, s := range order.Stages {
-		if s.Status != StageStatusCompleted {
+		if s.Status != StageStatusCompleted && s.Status != StageStatusSkipped {
 			allDone = false
 			break
 		}
@@ -291,6 +291,11 @@ type mergeResult struct {
 	Orders         OrdersFile
 	Promoted       bool
 	EmptyPromotion bool
+	// Incoming order IDs by what the merge did with them.
+	Added     []string
+	Replaced  []string
+	Amended   []string
+	Unchanged []string
 }
 
 // Reads and validates orders-next.json, merges into the provided orders, and
@@ -299,7 +304,7 @@ type mergeResult struct {
 // re-promotes idempotently — duplicate order IDs across the two files are
 // skipped (not rejected), except when replacing a failed order with a new
 // active proposal for explicit restart.
-func consumeOrdersNext(nextPath string, existing OrdersFile) (mergeResult, error) {
+func consumeOrdersNext(nextPath string, existing OrdersFile, keepStages []string) (mergeResult, error) {
 	nextData, err := os.ReadFile(nextPath)
 	if os.IsNotExist(err) {
 		return mergeResult{}, nil
@@ -335,27 +340,37 @@ func consumeOrdersNext(nextPath string, existing OrdersFile) (mergeResult, error
 	// except:
 	// 1) a failed existing order can be replaced by a new active proposal
 	// 2) an active existing order can be amended by a new active proposal
+	var added, replacedIDs, amended, unchanged []string
 	for _, order := range incoming.Orders {
 		idx, exists := existingIndex[order.ID]
 		if exists {
 			if shouldReplaceFailedOrder(existing.Orders[idx], order) {
 				existing.Orders[idx] = order
+				replacedIDs = append(replacedIDs, order.ID)
 				continue
 			}
-			merged, replaced := mergeAmendedActiveOrder(existing.Orders[idx], order)
+			merged, replaced := mergeAmendedActiveOrder(existing.Orders[idx], order, keepStages)
 			if replaced {
 				existing.Orders[idx] = merged
+				amended = append(amended, order.ID)
+			} else {
+				unchanged = append(unchanged, order.ID)
 			}
 			continue
 		}
 		existing.Orders = append(existing.Orders, order)
 		existingIndex[order.ID] = len(existing.Orders) - 1
+		added = append(added, order.ID)
 	}
 
 	return mergeResult{
 		Orders:         existing,
 		Promoted:       true,
 		EmptyPromotion: emptyPromotion,
+		Added:          added,
+		Replaced:       replacedIDs,
+		Amended:        amended,
+		Unchanged:      unchanged,
 	}, nil
 }
 
@@ -367,7 +382,13 @@ func shouldAmendActiveOrder(existing Order, incoming Order) bool {
 	return existing.Status == OrderStatusActive && incoming.Status == OrderStatusActive
 }
 
-func mergeAmendedActiveOrder(existing Order, incoming Order) (Order, bool) {
+// mergeAmendedActiveOrder replaces an active order's stages from its current
+// stage on with the incoming proposal. Existing stages from the current stage
+// on that the proposal leaves out stay at the end of the order: a running or
+// parked stage and stages named in keepStages ([review] extra_stages, which the
+// loop adds and the scheduler never proposes) keep their status, and the rest
+// are marked skipped.
+func mergeAmendedActiveOrder(existing Order, incoming Order, keepStages []string) (Order, bool) {
 	if !shouldAmendActiveOrder(existing, incoming) {
 		return existing, false
 	}
@@ -386,6 +407,7 @@ func mergeAmendedActiveOrder(existing Order, incoming Order) (Order, bool) {
 		sharedPrefix := matchingPrefixLen(existing.Stages[:currentIndex], incoming.Stages)
 		merged.Stages = append(completedPrefix, incoming.Stages[sharedPrefix:]...)
 	}
+	merged.Stages = append(merged.Stages, droppedStages(existing.Stages[currentIndex:], merged.Stages[currentIndex:], keepStages)...)
 	if len(merged.Stages) == 0 {
 		return existing, false
 	}
@@ -394,6 +416,24 @@ func mergeAmendedActiveOrder(existing Order, incoming Order) (Order, bool) {
 		return existing, false
 	}
 	return merged, true
+}
+
+// droppedStages returns the stages in oldTail whose task key is missing from
+// newTail. A stage keeps its status when it is running or parked (active or
+// merging) or its name is in keep; the rest are marked skipped.
+func droppedStages(oldTail []Stage, newTail []Stage, keep []string) []Stage {
+	var out []Stage
+	for _, s := range oldTail {
+		if slices.ContainsFunc(newTail, func(n Stage) bool { return n.TaskKey == s.TaskKey }) {
+			continue
+		}
+		inFlight := s.Status == StageStatusActive || s.Status == StageStatusMerging
+		if !inFlight && !slices.Contains(keep, s.TaskKey) {
+			s.Status = StageStatusSkipped
+		}
+		out = append(out, s)
+	}
+	return out
 }
 
 func firstMatchingStageIndex(stages []Stage, target Stage) int {

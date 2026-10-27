@@ -4,6 +4,7 @@ const BADGE_CLASS: Record<string, string> = {
   reflect: "bg-[#e8d0d8] text-[#6a3848] hover:bg-[#dcc0cc]",
   schedule: "bg-[#f0d8b8] text-[#6a4018] hover:bg-[#e6cca8]",
   plan: "bg-[#c8d8e8] text-[#2a4060] hover:bg-[#b8ccdc]",
+  "awaiting publish": "bg-[#f0e0a8] text-[#6a5010] hover:bg-[#e6d494]",
 };
 
 export function Badge({ type }: { type: string }) {

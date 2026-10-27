@@ -5,6 +5,9 @@ import type { Session } from "~/client";
 import { StreamingDelta } from "./StreamingDelta";
 import { groupConsecutiveTools } from "./group-tools";
 import { VirtualizedFeed } from "./VirtualizedFeed";
+import { isBusy, sendReported } from "./control-feedback";
+import { ControlResult } from "./ControlResult";
+import { PendingSteers, usePendingSteers } from "./PendingSteers";
 
 function findSchedulerSession(sessions: Session[]): Session | undefined {
   return sessions.find((s) => s.task_key?.toLowerCase().trim() === "schedule");
@@ -23,7 +26,8 @@ function isScheduleOnlyOrder(order: { stages: { task_key?: string }[] }): boolea
 
 export function SchedulerFeed() {
   const { data: snapshot } = useSuspenseSnapshot();
-  const { mutate: send, isPending } = useSendControl();
+  const control = useSendControl();
+  const { mutate: send, isPending } = control;
   const [input, setInput] = useState("");
 
   const schedulerSession = findSchedulerSession(snapshot.sessions);
@@ -44,6 +48,7 @@ export function SchedulerFeed() {
     ? snapshot.events_by_session[schedulerSession.id]
     : undefined;
   const { data: events = [] } = useSessionEvents(schedulerSession?.id, initialEvents);
+  const pendingSteers = usePendingSteers(send, "schedule", events);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -82,7 +87,7 @@ export function SchedulerFeed() {
     if (!prompt) {
       return;
     }
-    send({ action: "steer", target: "schedule", prompt });
+    pendingSteers.submit("schedule", prompt);
     setInput("");
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -97,12 +102,12 @@ export function SchedulerFeed() {
   }
 
   function handleStopAll() {
-    send({ action: "stop-all" });
+    sendReported(send, { action: "stop-all" }, "Stop All");
   }
 
   function handleStop() {
     if (schedulerSession) {
-      send({ action: "stop", name: schedulerSession.id });
+      sendReported(send, { action: "stop", name: schedulerSession.id }, "Stop");
     }
   }
 
@@ -151,6 +156,7 @@ export function SchedulerFeed() {
             className="feed-action-btn stop-btn"
             onClick={handleStopAll}
             disabled={isPending}
+            aria-busy={isBusy(control, "stop-all") || undefined}
           >
             Stop All
           </button>
@@ -163,9 +169,12 @@ export function SchedulerFeed() {
         items={items}
         emptyMessage={emptyMessage}
         tail={
-          isSchedulerThinking && schedulerSession?.id ? (
-            <StreamingDelta sessionId={schedulerSession.id} />
-          ) : undefined
+          <>
+            <PendingSteers steers={pendingSteers.steers} />
+            {isSchedulerThinking && schedulerSession?.id && (
+              <StreamingDelta sessionId={schedulerSession.id} />
+            )}
+          </>
         }
       />
 
@@ -193,8 +202,14 @@ export function SchedulerFeed() {
           </div>
           <div className="input-row-actions">
             {isSchedulerThinking && (
-              <button type="button" className="btn-stop" onClick={handleStop} disabled={isPending}>
-                {isPending ? "Stopping…" : "Stop"}
+              <button
+                type="button"
+                className="btn-stop"
+                onClick={handleStop}
+                disabled={isPending}
+                aria-busy={isBusy(control, "stop") || undefined}
+              >
+                {isBusy(control, "stop") ? "Stopping…" : "Stop"}
               </button>
             )}
             <button
@@ -202,11 +217,16 @@ export function SchedulerFeed() {
               className="btn-submit"
               onClick={handleSubmit}
               disabled={isPending || !input.trim()}
+              aria-busy={isBusy(control, "steer") || undefined}
             >
               Send
             </button>
           </div>
         </div>
+        <ControlResult
+          mutation={control}
+          labels={{ "stop-all": "Stop All", stop: "Stop", steer: "Send" }}
+        />
       </div>
     </>
   );

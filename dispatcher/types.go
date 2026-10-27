@@ -11,8 +11,9 @@ import (
 
 // ProviderConfig holds optional CLI binary directory and extra flags by provider.
 type ProviderConfig struct {
-	Path string
-	Args []string
+	Path          string
+	Args          []string
+	ExitAfterTurn bool
 }
 
 // ProviderConfigs holds per-provider configuration.
@@ -41,6 +42,7 @@ type DispatchRequest struct {
 	DisplayName          string // stable short name preserved across retries
 	Title                string // queue item title for display
 	RetryCount           int    // attempt number (0 = first try)
+	KeepAlive            bool   // keep stdin open after a turn so the loop can keep sending messages (the scheduler)
 }
 
 // Validate ensures required request fields are set at the boundary.

@@ -20,6 +20,9 @@ const (
 	OrderCompleted OrderLifecycleStatus = "completed"
 	OrderFailed    OrderLifecycleStatus = "failed"
 	OrderCancelled OrderLifecycleStatus = "cancelled"
+	// OrderAwaitingPublish is a gated order whose stages all finished with
+	// their work kept on local branches, waiting for a human to publish it.
+	OrderAwaitingPublish OrderLifecycleStatus = "awaiting-publish"
 )
 
 // StageLifecycleStatus is the lifecycle status of a stage within an order.

@@ -23,11 +23,20 @@ Run in order. Stop early and reject on any high-severity finding.
 - Read the plan phase the cook was assigned (from the cook's initial prompt or mise context).
 - Run `git diff --stat` and `git log --oneline` for the cook's commits.
 - Flag files changed outside the plan phase's stated scope as scope violations.
+- Reject (high severity) if the diff touches a path the backlog item marks as off-limits, adds a binary or generated file (`*.db`, build output, lockfiles the item did not ask for), or includes files under `.graymatter/`, `.noodle/`, `brain/` or `.worktrees/`.
+
+### No-change results
+
+An empty diff is not a reason to reject on its own. If the cook made no commits, find the execute stage's final message: the `stage_yield` in `<main checkout>/.noodle/sessions/<order_id>-*-execute-*/events.ndjson` (newest one), where the main checkout is `$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")`.
+
+- If it starts with `NO CHANGE NEEDED:`, review the evidence instead of a diff: the logs it names exist, they show the checks passing, and the checks ran at the current base commit. If you doubt it, rerun the relevant command from `brain/principles/verification.md` once. Accept with `"No change needed: <evidence summary>"` and `blocking: false` when it holds. Reject only when the evidence is missing or does not support the claim, and say what is missing.
+- If it starts with `UNVERIFIED:`, do not reject for lack of passing runs. Check that the reason is one `brain/principles/verification.md` allows, the baseline evidence shows the failure, and the diff plausibly addresses it. Accept with `"Unverified: <summary>"` and `blocking: false` when it holds.
+- If there is no such message (the cook was cancelled or stopped early), reject with `"No cook work: execute produced no commits and no NO CHANGE NEEDED evidence. Re-run execute."`
 
 ### 2. Code Quality
 
-- `go vet ./...` and `go test ./...` must pass.
-- Run `sh scripts/lint-arch.sh` if it exists.
+- Run every command in `brain/principles/verification.md` and quote the result. A failure is high severity.
+- If that file does not exist: `go vet ./...` and `go test ./...` must pass, and run `sh scripts/lint-arch.sh` if it exists.
 - Check error handling follows project conventions (failure-state messages, not expectation messages).
 
 ### 3. Principle Compliance

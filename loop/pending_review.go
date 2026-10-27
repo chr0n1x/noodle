@@ -30,6 +30,14 @@ type PendingReviewItem struct {
 	WorktreePath string   `json:"worktree_path"`
 	SessionID    string   `json:"session_id,omitempty"`
 	Reason       string   `json:"reason,omitempty"`
+	// BlockedActions lists control actions the loop refuses for this review
+	// (approve and merge on an external hold, merge in a gated order);
+	// BlockedReason says why.
+	BlockedActions []string `json:"blocked_actions,omitempty"`
+	BlockedReason  string   `json:"blocked_reason,omitempty"`
+	// PublishGated is set by the snapshot when the config gates publishing,
+	// where request-changes re-runs the stage instead of failing the order.
+	PublishGated bool `json:"publish_gated,omitempty"`
 }
 
 type pendingReviewFile struct {
@@ -76,11 +84,15 @@ func (l *Loop) parkPendingReview(cook *cookHandle, reason string) error {
 func (l *Loop) writePendingReview() error {
 	items := make([]PendingReviewItem, 0, len(l.canonical.PendingReviews))
 	for _, review := range l.canonical.PendingReviews {
+		title := ""
+		if order, ok := l.canonical.Orders[review.OrderID]; ok {
+			title = order.Title
+		}
 		items = append(items, PendingReviewItem{
 			OrderID:      review.OrderID,
 			StageIndex:   review.StageIndex,
 			TaskKey:      review.TaskKey,
-			Title:        "",
+			Title:        title,
 			Prompt:       review.Prompt,
 			Provider:     review.Provider,
 			Model:        review.Model,
@@ -240,8 +252,10 @@ func canonicalStageStatusToLegacy(status state.StageLifecycleStatus) orderx.Stag
 		return StageStatusCompleted
 	case state.StageFailed:
 		return StageStatusFailed
-	case state.StageCancelled, state.StageSkipped:
+	case state.StageCancelled:
 		return StageStatusCancelled
+	case state.StageSkipped:
+		return StageStatusSkipped
 	default:
 		return StageStatusPending
 	}
@@ -253,6 +267,8 @@ func canonicalOrderStatusToLegacy(status state.OrderLifecycleStatus) (orderx.Ord
 		return "", true
 	case state.OrderFailed:
 		return OrderStatusFailed, false
+	case state.OrderAwaitingPublish:
+		return OrderStatusAwaitingPublish, false
 	default:
 		return OrderStatusActive, false
 	}

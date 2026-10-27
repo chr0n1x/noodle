@@ -197,6 +197,7 @@ func (l *Loop) ensureScheduleOrderPresent() error {
 
 func (l *Loop) reconcileStaleDispatchStages() error {
 	changed := false
+	reset := make(map[string]map[int]bool)
 	now := timeNowUTC(l.deps.Now)
 	for orderID, order := range l.canonical.Orders {
 		if order.Status.IsTerminal() {
@@ -225,6 +226,10 @@ func (l *Loop) reconcileStaleDispatchStages() error {
 			order.Stages[i] = stage
 			orderChanged = true
 			changed = true
+			if reset[orderID] == nil {
+				reset[orderID] = make(map[int]bool)
+			}
+			reset[orderID][i] = true
 			if strings.EqualFold(strings.TrimSpace(orderID), scheduleOrderID) {
 				l.logger.Info("startup reset stale canonical schedule stage", "order", orderID, "stage", i)
 			} else {
@@ -248,8 +253,10 @@ func (l *Loop) reconcileStaleDispatchStages() error {
 			if _, adopted := l.cooks.adoptedTargets[order.ID]; adopted {
 				continue
 			}
+			// orders.json stores a parked stage as active too, so reset only
+			// the stages reset above.
 			for si := range order.Stages {
-				if order.Stages[si].Status != StageStatusActive {
+				if order.Stages[si].Status != StageStatusActive || !reset[order.ID][si] {
 					continue
 				}
 				order.Stages[si].Status = StageStatusPending

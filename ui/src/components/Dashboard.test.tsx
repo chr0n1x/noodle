@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { buildSnapshot, buildSession } from "~/test-utils";
+import { buildOrder, buildSnapshot, buildSession, buildStage } from "~/test-utils";
 import { Dashboard } from "./Dashboard";
 import type { Snapshot } from "~/client";
 
@@ -199,6 +199,81 @@ describe("Dashboard", () => {
     render(<Dashboard />);
 
     expect(screen.getByText("my-agent")).toBeInTheDocument();
+  });
+
+  it("links a cook's title to its order's url without navigating the row", async () => {
+    const user = userEvent.setup();
+    setSnapshot({
+      active: [buildSession({ id: "s9", status: "running", title: "PROJ-123 fix login bug" })],
+      recent: [],
+      orders: [
+        buildOrder({
+          id: "9",
+          url: "https://jira.example.com/browse/PROJ-123",
+          stages: [buildStage({ session_id: "s9" })],
+        }),
+      ],
+    });
+    mockNavigate.mockReset();
+
+    render(<Dashboard />);
+    const link = screen.getByRole("link", { name: "PROJ-123 fix login bug" });
+    expect(link).toHaveAttribute("href", "https://jira.example.com/browse/PROJ-123");
+    await user.click(link);
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("titles an untitled cook with its order's title", () => {
+    setSnapshot({
+      active: [buildSession({ id: "s1", display_name: "1-0-execute-s1", title: undefined })],
+      recent: [],
+      orders: [
+        buildOrder({
+          id: "1",
+          title: "PROJ-124 update docs",
+          url: "https://jira.example.com/browse/PROJ-124",
+          stages: [buildStage({ session_id: "s1" })],
+        }),
+      ],
+    });
+
+    render(<Dashboard />);
+    expect(screen.getByRole("link", { name: "PROJ-124 update docs" })).toHaveAttribute(
+      "href",
+      "https://jira.example.com/browse/PROJ-124",
+    );
+    expect(screen.queryByText("1-0-execute-s1", { selector: "a" })).toBeNull();
+  });
+
+  it("keeps a plain title when the order has no usable url", () => {
+    setSnapshot({
+      active: [buildSession({ id: "s1", title: "No link here" })],
+      recent: [],
+      orders: [
+        buildOrder({ id: "1", url: "not a url", stages: [buildStage({ session_id: "s1" })] }),
+      ],
+    });
+
+    render(<Dashboard />);
+    expect(screen.queryByRole("link", { name: "No link here" })).toBeNull();
+    expect(screen.getByText("No link here")).toBeInTheDocument();
+  });
+
+  it("titles the scheduler session", () => {
+    setSnapshot({
+      active: [
+        buildSession({
+          id: "schedule-1",
+          task_key: "schedule",
+          title: undefined,
+          display_name: "",
+        }),
+      ],
+      recent: [],
+    });
+
+    render(<Dashboard />);
+    expect(screen.getByText("Scheduler")).toBeInTheDocument();
   });
 
   it("shows local as host fallback", () => {

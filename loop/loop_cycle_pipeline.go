@@ -37,7 +37,7 @@ func (l *Loop) mergeOrdersNext() (mergeResult, error) {
 	if err != nil {
 		return mergeResult{}, err
 	}
-	return consumeOrdersNext(l.deps.OrdersNextFile, orders)
+	return consumeOrdersNext(l.deps.OrdersNextFile, orders, l.config.Review.ExtraStages)
 }
 
 // handlePromotionResult processes the side effects of an orders-next
@@ -52,7 +52,7 @@ func (l *Loop) handlePromotionResult(result mergeResult, err error) error {
 		return nil
 	}
 
-	l.logger.Info("orders-next promoted")
+	l.logger.Info("orders-next promoted", "added", result.Added, "replaced", result.Replaced, "amended", result.Amended, "unchanged", result.Unchanged)
 	l.schedulePromoted = true
 	l.lastPromotionError = ""
 	if result.EmptyPromotion {
@@ -60,6 +60,14 @@ func (l *Loop) handlePromotionResult(result mergeResult, err error) error {
 		l.logger.Info("schedule produced no orders, entering cooldown")
 	} else {
 		l.scheduleNothingUntil = time.Time{}
+	}
+	var unknownExtra []string
+	result.Orders, unknownExtra = applyExtraStages(result.Orders, l.config.Review.ExtraStages, func(name string) bool {
+		_, ok := l.registry.ByKey(name)
+		return ok
+	})
+	for _, name := range unknownExtra {
+		l.logger.Warn("review extra stage skipped: no skill registered", "stage", name)
 	}
 	if err := l.writeOrdersState(result.Orders); err != nil {
 		l.handlePromotionError(err)

@@ -23,6 +23,7 @@ import (
 
 type fakeWorktree struct {
 	created            []string
+	createOpts         []worktree.CreateOpts
 	merged             []string
 	remoteMerged       []string
 	cleaned            []string
@@ -31,10 +32,16 @@ type fakeWorktree struct {
 	createErr          error
 	createErrByName    map[string]error
 	hasUnmergedCommits map[string]bool
+	cherryErr          error
 }
 
-func (f *fakeWorktree) Create(name string, _ ...worktree.CreateOpts) error {
+func (f *fakeWorktree) Create(name string, opts ...worktree.CreateOpts) error {
 	f.created = append(f.created, name)
+	var o worktree.CreateOpts
+	if len(opts) > 0 {
+		o = opts[0]
+	}
+	f.createOpts = append(f.createOpts, o)
 	if f.createErrByName != nil {
 		if err, ok := f.createErrByName[name]; ok {
 			return err
@@ -55,6 +62,9 @@ func (f *fakeWorktree) Cleanup(name string, _ ...worktree.CleanupOpts) error {
 	return nil
 }
 func (f *fakeWorktree) HasUnmergedCommits(name string) (bool, error) {
+	if f.cherryErr != nil {
+		return false, f.cherryErr
+	}
 	if f.hasUnmergedCommits != nil {
 		if v, ok := f.hasUnmergedCommits[name]; ok {
 			return v, nil

@@ -58,6 +58,9 @@ func New(projectDir, noodleBin string, cfg config.Config, deps Dependencies) *Lo
 		if deps.StatusFile == "" {
 			deps.StatusFile = defaults.StatusFile
 		}
+		if deps.DraftPR == nil {
+			deps.DraftPR = defaults.DraftPR
+		}
 	}
 	if deps.Now == nil {
 		deps.Now = time.Now

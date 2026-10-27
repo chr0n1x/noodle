@@ -3,6 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import { useSuspenseSnapshot, formatCost, formatDuration } from "~/client";
 import type { Snapshot } from "~/client";
+import { OrderTitle, orderForSession } from "./order-link";
 
 type SortKey = "id" | "title" | "status" | "host" | "model" | "duration" | "cost";
 type SortDir = "asc" | "desc";
@@ -10,6 +11,7 @@ type SortDir = "asc" | "desc";
 interface SessionRow {
   id: string;
   title: string;
+  url?: string;
   status: string;
   host: string;
   model: string;
@@ -20,9 +22,11 @@ interface SessionRow {
 function deriveSessionRows(snapshot: Snapshot): SessionRow[] {
   const rows: SessionRow[] = [];
   for (const s of [...snapshot.active, ...snapshot.recent]) {
+    const order = orderForSession(snapshot, s.id);
     rows.push({
       id: s.id,
-      title: s.title || s.display_name,
+      title: s.title || order?.title || (s.task_key === "schedule" ? "Scheduler" : s.display_name),
+      url: order?.url,
       status: s.status,
       host: s.remote_host || "local",
       model: s.model,
@@ -175,7 +179,9 @@ export function Dashboard() {
                 }}
               >
                 <td className="px-3 py-2 font-mono text-sm">{row.id}</td>
-                <td className="px-3 py-2 font-mono text-sm max-w-[300px] truncate">{row.title}</td>
+                <td className="px-3 py-2 font-mono text-sm max-w-[300px] truncate">
+                  <OrderTitle title={row.title} url={row.url} />
+                </td>
                 <td className="px-3 py-2">
                   <span
                     className={`inline-block px-2 py-0.5 font-mono text-xs font-bold uppercase ${statusClass(row.status)}`}

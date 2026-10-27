@@ -36,8 +36,9 @@ func defaultDependencies(projectDir, runtimeDir, noodleBin string, cfg config.Co
 		Sink:          sink,
 		ProviderConfigs: dispatcher.ProviderConfigs{
 			Claude: dispatcher.ProviderConfig{
-				Path: cfg.Agents.Claude.Path,
-				Args: cfg.Agents.Claude.Args,
+				Path:          cfg.Agents.Claude.Path,
+				Args:          cfg.Agents.Claude.Args,
+				ExitAfterTurn: cfg.Agents.Claude.ExitAfterTurn,
 			},
 			Codex: dispatcher.ProviderConfig{
 				Path: cfg.Agents.Codex.Path,
@@ -74,11 +75,17 @@ func defaultDependencies(projectDir, runtimeDir, noodleBin string, cfg config.Co
 	if wtApp != nil {
 		wtApp.CmdPrefix = "noodle worktree"
 		wtApp.Quiet = true
+		wtApp.LinkPaths = cfg.Worktree.Link
 		wt = wtApp
 	} else {
 		wt = noOpWorktree{}
 	}
+	var draftPR DraftPRPublisher
+	if cfg.Delivery.Enabled() {
+		draftPR = newGitDraftPRPublisher(projectDir, runtimeDir, cfg.Delivery)
+	}
 	return Dependencies{
+		DraftPR:        draftPR,
 		Runtimes:       runtimes,
 		Worktree:       wt,
 		Adapter:        adapter.NewRunner(projectDir, cfg),

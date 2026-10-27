@@ -44,12 +44,14 @@ const (
 	StageStatusCompleted = orderx.StageStatusCompleted
 	StageStatusFailed    = orderx.StageStatusFailed
 	StageStatusCancelled = orderx.StageStatusCancelled
+	StageStatusSkipped   = orderx.StageStatusSkipped
 )
 
 const (
-	OrderStatusActive    = orderx.OrderStatusActive
-	OrderStatusCompleted = orderx.OrderStatusCompleted
-	OrderStatusFailed    = orderx.OrderStatusFailed
+	OrderStatusActive          = orderx.OrderStatusActive
+	OrderStatusCompleted       = orderx.OrderStatusCompleted
+	OrderStatusFailed          = orderx.OrderStatusFailed
+	OrderStatusAwaitingPublish = orderx.OrderStatusAwaitingPublish
 )
 
 type StageResultStatus string
@@ -72,6 +74,7 @@ type ControlCommand struct {
 	Provider string    `json:"provider,omitempty"`
 	Model    string    `json:"model,omitempty"`
 	Skill    string    `json:"skill,omitempty"`
+	Publish  string    `json:"publish,omitempty"`
 	At       time.Time `json:"at,omitempty"`
 }
 
@@ -162,6 +165,7 @@ type Dependencies struct {
 	OrdersFile     string
 	OrdersNextFile string
 	StatusFile     string
+	DraftPR        DraftPRPublisher
 }
 
 type Loop struct {
@@ -206,10 +210,10 @@ type Loop struct {
 	lastStatus statusfile.Status
 
 	// V2 canonical state — event-sourced pipeline.
-	canonical    state.State
+	canonical       state.State
 	canonicalLoaded bool
-	effectLedger *reducer.EffectLedger
-	eventCounter atomic.Uint64
+	effectLedger    *reducer.EffectLedger
+	eventCounter    atomic.Uint64
 
 	reconciledFailures []reconciledFailure
 	lastMiseWarnings   []string

@@ -64,6 +64,8 @@ export interface Snapshot {
   mode: string;
   max_concurrency: number /* int */;
   warnings: string[];
+  draft_pr: boolean;
+  draft_prs?: { [key: string]: DraftPRLink };
 }
 /**
  * Session represents a single agent session.
@@ -96,10 +98,23 @@ export interface Session {
 export interface Order {
   id: string;
   title?: string;
+  /**
+   * URL links the order to its source (a ticket or pull request); it is
+   * empty when the scheduler had no well-formed http(s) link for it.
+   */
+  url?: string;
   plan?: string[];
   rationale?: string;
   stages: Stage[];
   status: string;
+  /**
+   * PublishGated, PublishBlockedReason and PublishError are set only when
+   * the config gates publishing; an empty reason means approve-and-publish
+   * would be accepted.
+   */
+  publish_gated?: boolean;
+  publish_blocked_reason?: string;
+  publish_error?: string;
 }
 /**
  * Stage is a unit of work within an order in the snapshot.
@@ -137,4 +152,9 @@ export interface FeedEvent {
   body: string;
   category: string;
   failure?: unknown /* loop.EventFailureMetadata */;
+}
+
+export interface DraftPRLink {
+  branch: string;
+  url: string;
 }

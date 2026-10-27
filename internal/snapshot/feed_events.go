@@ -243,7 +243,10 @@ func readLoopEvents(runtimeDir string) []FeedEvent {
 				body = owner + body
 			}
 		default:
-			continue
+			var ok bool
+			if label, body, category, taskType, ok = forkFeedEvent(raw.Type, raw.Payload); !ok {
+				continue
+			}
 		}
 
 		at := raw.At

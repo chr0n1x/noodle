@@ -18,6 +18,7 @@ type App struct {
 	MergeLockTimeout  time.Duration // 0 uses defaultMergeLockTimeout
 	IntegrationBranch string        // override for the integration branch; auto-discovered when empty
 	Quiet             bool          // suppress stdout/stderr chatter for programmatic callers
+	LinkPaths         []string      // root-relative paths symlinked into new worktrees when present
 }
 
 // cmdName returns the full command name for user-facing messages.

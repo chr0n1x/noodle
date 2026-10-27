@@ -11,12 +11,18 @@ schedule: "Follow-up stage after quality — capture learnings from the complete
 
 Review the conversation and persist learnings — to `brain/`, to skill files, or as structural enforcement.
 
+When you run as a scheduled reflect stage, you start in a new session and have no conversation to read. Do not claim you have conversation access. Inspect the order's work instead:
+
+- The order's commits: `git log` and `git diff` against the base branch.
+- `brain/reviews/*.md` files for the order.
+- The `stage_yield` messages of the order's earlier sessions, if readable (`.noodle/sessions/<order_id>-*/events.ndjson` in the main checkout).
+
 ## Process
 
 **Use Tasks to track progress** (TaskCreate per step, TaskUpdate to in_progress/completed).
 
 1. **Read `brain/index.md`** to understand what notes already exist
-2. **Scan the conversation** for:
+2. **Scan the conversation** (or, in a scheduled stage, the order's work listed above) for:
    - Mistakes made and corrections received
    - User preferences and workflow patterns
    - Codebase knowledge gained (architecture, gotchas, patterns)
@@ -27,6 +33,13 @@ Review the conversation and persist learnings — to `brain/`, to skill files, o
 3. **Skip** anything trivial or already captured in existing brain files
 4. **Route each learning** to the right destination (see Routing below)
 5. **Update `brain/index.md`** if any brain files were added or removed
+6. **Yield** after writing learnings, then end your turn:
+
+   ```bash
+   noodle event emit --session $NOODLE_SESSION_ID stage_yield --payload '{"message": "Reflect: <one-line summary>"}'
+   ```
+
+   Without this, a finished reflect stage can be treated as ending its turn without changes and parked.
 
 ## Routing
 

@@ -162,6 +162,7 @@ func (l *Loop) spawnSchedule(ctx context.Context, order Order, attempt int, resu
 		Skill:                skillName,
 		WorktreePath:         l.projectDir,
 		AllowPrimaryCheckout: true,
+		KeepAlive:            true,
 		Title:                order.Title,
 		RetryCount:           attempt,
 	}
