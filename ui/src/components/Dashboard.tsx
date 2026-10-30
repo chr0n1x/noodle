@@ -37,11 +37,6 @@ function deriveSessionRows(snapshot: Snapshot): SessionRow[] {
   return rows;
 }
 
-function isCompletedStatus(status: string): boolean {
-  const normalized = status.toLowerCase();
-  return normalized === "merged" || normalized === "completed" || normalized === "done";
-}
-
 function needsReview(snapshot: Snapshot, sessionID: string): boolean {
   return (snapshot.pending_reviews ?? []).some((review) => review.session_id === sessionID);
 }
@@ -107,7 +102,7 @@ export function Dashboard() {
   }
 
   function handleRowClick(row: SessionRow) {
-    if (isCompletedStatus(row.status) || needsReview(snapshot, row.id)) {
+    if (needsReview(snapshot, row.id)) {
       navigate({ to: "/reviews" });
       return;
     }

@@ -154,10 +154,12 @@ func (l *Loop) spawnSchedule(ctx context.Context, order Order, attempt int, resu
 	promotionError := l.lastPromotionError
 	l.lastPromotionError = ""
 	failures := l.reconciledFailures
+	provider := nonEmpty(stage.Provider, l.config.Routing.Defaults.Provider)
+	prompt := buildSchedulePrompt(skillName, taskTypesPrompt, order, resumePrompt, l.runtimeDir, promotionError, failures, l.lastMiseWarnings)
 	req := loopruntime.DispatchRequest{
 		Name:                 name,
-		Prompt:               buildSchedulePrompt(skillName, taskTypesPrompt, order, resumePrompt, l.runtimeDir, promotionError, failures, l.lastMiseWarnings),
-		Provider:             nonEmpty(stage.Provider, l.config.Routing.Defaults.Provider),
+		Prompt:               skillWordingForProvider(prompt, provider, skillName),
+		Provider:             provider,
 		Model:                nonEmpty(stage.Model, l.config.Routing.Defaults.Model),
 		Skill:                skillName,
 		WorktreePath:         l.projectDir,

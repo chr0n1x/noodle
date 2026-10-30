@@ -118,6 +118,7 @@ func LoadSnapshot(runtimeDir string, now time.Time, state loop.LoopState) (Snaps
 			} else if sid := completedSessionByStage[orderStageKey{order.ID, s.TaskKey}]; sid != "" {
 				s.SessionID = sid
 			}
+			setOutcomeFields(&s)
 			stages = append(stages, s)
 		}
 		orders = append(orders, Order{

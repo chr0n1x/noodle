@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/poteto/noodle/adapter"
+	"github.com/poteto/noodle/config"
 	"github.com/poteto/noodle/event"
 	"github.com/poteto/noodle/internal/ingest"
 	"github.com/poteto/noodle/internal/mode"
@@ -125,6 +126,12 @@ func (l *Loop) handleCompletion(ctx context.Context, cook *cookHandle, resultSta
 		}
 		if isPublishStage(cook.stage) {
 			return l.completePublishStage(ctx, cook)
+		}
+		if isHookStage(cook.stage) {
+			return l.completeHook(ctx, cook)
+		}
+		if handled, err := l.applyConfiguredCompletion(ctx, cook); handled {
+			return err
 		}
 		if l.autoQualityOn() && cook.stage.TaskKey == "quality" {
 			if m := l.readStageMessage(cook.session.ID()); m != nil && m.IsBlocking() {
@@ -277,6 +284,14 @@ func (l *Loop) handleStageFailure(ctx context.Context, cook *cookHandle, resultS
 	if isPublishStage(cook.stage) {
 		return l.failPublishStage(cook, reason)
 	}
+	if resultStatus != StageResultCancelled && (cook.stage.TaskKey == reflectTaskKey || isHookStage(cook.stage)) {
+		return l.skipFailedReflect(ctx, cook, reason)
+	}
+	if resultStatus != StageResultCancelled {
+		if action, ok := l.configuredAction(cook.stage, config.StageStateReject); ok {
+			return l.applyOutcome(ctx, cook, config.StageStateReject, action, reason)
+		}
+	}
 	return l.failStage(nil, cook, reason)
 }
 
@@ -355,6 +370,14 @@ func (l *Loop) advanceAndPersist(ctx context.Context, cook *cookHandle, message 
 		l.noteAwaitingPublish(cook.orderID)
 		l.noteKeptWork(cook.orderID)
 		l.autoPublish(cook.orderID)
+	}
+	if orderStatus == state.OrderFailed {
+		if rejected, ok := state.RejectedThrough(l.canonical.Orders[cook.orderID]); ok {
+			reason := nonEmpty("rejected: "+rejected.Feedback, "rejected")
+			l.logger.Warn("order failed: a stage was rejected", "order", cook.orderID, "reason", reason)
+			l.forwardToScheduler(cook, "order_rejected", reason, nil)
+			l.noteKeptWork(cook.orderID)
+		}
 	}
 	if orderStatus == state.OrderCompleted {
 		_ = l.events.Emit(LoopEventOrderCompleted, OrderCompletedPayload{

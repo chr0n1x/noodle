@@ -99,7 +99,8 @@ source_hash: e8e684f177619a3b42fc12b31c1c2955d55bdf57bced493774f4b9c6c4a3f341
           "provider": "claude",
           "model": "claude-sonnet-4-6",
           "status": "active",
-          "session_id": "cook-a"
+          "session_id": "cook-a",
+          "state": "in-progress"
         }
       ],
       "status": "active"
@@ -113,7 +114,8 @@ source_hash: e8e684f177619a3b42fc12b31c1c2955d55bdf57bced493774f4b9c6c4a3f341
           "skill": "execute",
           "provider": "claude",
           "model": "claude-sonnet-4-6",
-          "status": "completed"
+          "status": "completed",
+          "state": "accept"
         },
         {
           "task_key": "review",
@@ -121,7 +123,8 @@ source_hash: e8e684f177619a3b42fc12b31c1c2955d55bdf57bced493774f4b9c6c4a3f341
           "provider": "claude",
           "model": "claude-sonnet-4-6",
           "status": "active",
-          "session_id": "cook-b"
+          "session_id": "cook-b",
+          "state": "in-progress"
         }
       ],
       "status": "active"

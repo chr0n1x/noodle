@@ -282,6 +282,8 @@ func (l *Loop) dispatchControlCommand(cmd ControlCommand) error {
 		return l.controlAdvance(cmd.OrderID)
 	case "add-stage":
 		return l.controlAddStage(cmd)
+	case "resolve":
+		return l.controlResolve(cmd.OrderID, cmd.TaskKey, cmd.State, cmd.Do, cmd.Prompt)
 	case "stage-complete":
 		return l.controlStageComplete(cmd.OrderID, cmd.TaskKey, cmd.Prompt, stringx.Normalize(cmd.Value) == "reject")
 	case "park-review":

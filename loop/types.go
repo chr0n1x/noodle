@@ -63,19 +63,23 @@ const (
 )
 
 type ControlCommand struct {
-	ID       string    `json:"id"`
-	Action   string    `json:"action"`
-	OrderID  string    `json:"order_id,omitempty"`
-	Name     string    `json:"name,omitempty"`
-	Target   string    `json:"target,omitempty"`
-	Prompt   string    `json:"prompt,omitempty"`
-	Value    string    `json:"value,omitempty"`
-	TaskKey  string    `json:"task_key,omitempty"`
-	Provider string    `json:"provider,omitempty"`
-	Model    string    `json:"model,omitempty"`
-	Skill    string    `json:"skill,omitempty"`
-	Publish  string    `json:"publish,omitempty"`
-	At       time.Time `json:"at,omitempty"`
+	ID       string `json:"id"`
+	Action   string `json:"action"`
+	OrderID  string `json:"order_id,omitempty"`
+	Name     string `json:"name,omitempty"`
+	Target   string `json:"target,omitempty"`
+	Prompt   string `json:"prompt,omitempty"`
+	Value    string `json:"value,omitempty"`
+	TaskKey  string `json:"task_key,omitempty"`
+	Provider string `json:"provider,omitempty"`
+	Model    string `json:"model,omitempty"`
+	Skill    string `json:"skill,omitempty"`
+	Publish  string `json:"publish,omitempty"`
+	// State and Do are a resolve command's verdict (accept or reject) and
+	// action (promote, exit, park, retry, retry-previous).
+	State string    `json:"state,omitempty"`
+	Do    string    `json:"do,omitempty"`
+	At    time.Time `json:"at,omitempty"`
 }
 
 type ControlAck struct {

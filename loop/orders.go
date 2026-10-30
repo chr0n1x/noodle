@@ -420,7 +420,8 @@ func mergeAmendedActiveOrder(existing Order, incoming Order, keepStages []string
 
 // droppedStages returns the stages in oldTail whose task key is missing from
 // newTail. A stage keeps its status when it is running or parked (active or
-// merging) or its name is in keep; the rest are marked skipped.
+// merging), its name is in keep, or it is an after hook; the rest are marked
+// skipped.
 func droppedStages(oldTail []Stage, newTail []Stage, keep []string) []Stage {
 	var out []Stage
 	for _, s := range oldTail {
@@ -428,7 +429,7 @@ func droppedStages(oldTail []Stage, newTail []Stage, keep []string) []Stage {
 			continue
 		}
 		inFlight := s.Status == StageStatusActive || s.Status == StageStatusMerging
-		if !inFlight && !slices.Contains(keep, s.TaskKey) {
+		if !inFlight && !slices.Contains(keep, s.TaskKey) && hookPoint(s) != hookAfter {
 			s.Status = StageStatusSkipped
 		}
 		out = append(out, s)

@@ -374,5 +374,7 @@ func parseControlRequest(action string, req controlRequest) (loop.ControlCommand
 		Provider: strings.TrimSpace(req.Provider),
 		Model:    strings.TrimSpace(req.Model),
 		Skill:    strings.TrimSpace(req.Skill),
+		State:    strings.TrimSpace(req.State),
+		Do:       strings.TrimSpace(req.Do),
 	}, nil
 }

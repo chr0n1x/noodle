@@ -6,6 +6,7 @@ import {
   formatDuration,
 } from "~/client";
 import type { Snapshot, Session, Order, PendingReviewItem } from "~/client";
+import { useNavigate } from "@tanstack/react-router";
 import { MetricCard } from "./MetricCard";
 import { StageRail } from "./StageRail";
 import { DiffViewer } from "./DiffViewer";
@@ -138,6 +139,7 @@ function SchedulerContext({ snapshot }: { snapshot: Snapshot }) {
 }
 
 function AgentContext({ session, snapshot }: { session: Session; snapshot: Snapshot }) {
+  const navigate = useNavigate();
   const order = findOrderForSession(session.id, snapshot);
 
   const completedStages = order ? order.stages.filter((s) => s.status === "completed").length : 0;
@@ -184,7 +186,10 @@ function AgentContext({ session, snapshot }: { session: Session; snapshot: Snaps
       {order && (
         <>
           <div className="ctx-section-label">Pipeline</div>
-          <StageRail stages={order.stages} />
+          <StageRail
+            stages={order.stages}
+            onOpenSession={(id) => navigate({ to: "/actor/$id", params: { id } })}
+          />
 
           {totalStages > 0 && (
             <div className="ctx-progress" style={{ marginTop: 12 }}>

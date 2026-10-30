@@ -114,6 +114,19 @@ type Stage struct {
 	Status    string                     `json:"status"`
 	Extra     map[string]json.RawMessage `json:"extra,omitempty"`
 	SessionID string                     `json:"session_id,omitempty"`
+	// State is the user-facing state: pending, in-progress, accept, reject
+	// or skipped.
+	State string `json:"state,omitempty"`
+	// Outcomes are the verdicts recorded on the stage, oldest first.
+	Outcomes []StageOutcome `json:"outcomes,omitempty"`
+}
+
+// StageOutcome is one verdict on a stage: state (accept or reject), the
+// action taken (promote, exit, park, retry, retry-previous) and feedback.
+type StageOutcome struct {
+	State    string `json:"state"`
+	Action   string `json:"action"`
+	Feedback string `json:"feedback,omitempty"`
 }
 
 // EventLine is a single parsed event in a session trace.

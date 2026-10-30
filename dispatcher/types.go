@@ -38,6 +38,8 @@ type DispatchRequest struct {
 	TaskKey              string // resolved task type key (e.g., "execute", "schedule")
 	Runtime              string // runtime kind from queue item (e.g., "process", "sprites")
 	SystemPrompt         string // if set, used directly as system prompt — skips skill resolution
+	StageSystemPrompt    string // [stages.<task>] system_prompt, placed after the skill
+	ModelProvider        string // codex model_provider
 	DispatchWarning      string // set by factory on runtime fallback — carries the original dispatch error
 	DisplayName          string // stable short name preserved across retries
 	Title                string // queue item title for display

@@ -53,6 +53,9 @@ func (l *Loop) handlePromotionResult(result mergeResult, err error) error {
 	}
 
 	l.logger.Info("orders-next promoted", "added", result.Added, "replaced", result.Replaced, "amended", result.Amended, "unchanged", result.Unchanged)
+	for _, id := range result.Added {
+		l.forgetOrderWork(id)
+	}
 	l.schedulePromoted = true
 	l.lastPromotionError = ""
 	if result.EmptyPromotion {
@@ -69,6 +72,8 @@ func (l *Loop) handlePromotionResult(result mergeResult, err error) error {
 	for _, name := range unknownExtra {
 		l.logger.Warn("review extra stage skipped: no skill registered", "stage", name)
 	}
+	result.Orders = l.applyConfiguredHooks(result.Orders)
+	result.Orders = applyStageRouting(result.Orders, l.config.Stages)
 	if err := l.writeOrdersState(result.Orders); err != nil {
 		l.handlePromotionError(err)
 		return nil

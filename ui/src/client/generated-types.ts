@@ -130,6 +130,24 @@ export interface Stage {
   status: string;
   extra?: Record<string, unknown>;
   session_id?: string;
+  /**
+   * State is the user-facing state: pending, in-progress, accept, reject
+   * or skipped.
+   */
+  state?: string;
+  /**
+   * Outcomes are the verdicts recorded on the stage, oldest first.
+   */
+  outcomes?: StageOutcome[];
+}
+/**
+ * StageOutcome is one verdict on a stage: state (accept or reject), the
+ * action taken (promote, exit, park, retry, retry-previous) and feedback.
+ */
+export interface StageOutcome {
+  state: string;
+  action: string;
+  feedback?: string;
 }
 /**
  * EventLine is a single parsed event in a session trace.

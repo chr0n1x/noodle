@@ -7,7 +7,9 @@ import (
 	"maps"
 	"strings"
 
+	"github.com/poteto/noodle/config"
 	"github.com/poteto/noodle/internal/ingest"
+	"github.com/poteto/noodle/internal/state"
 	"github.com/poteto/noodle/internal/stringx"
 	"github.com/poteto/noodle/worktree"
 )
@@ -98,6 +100,11 @@ func (l *Loop) controlReject(orderID string) error {
 	if err := l.ensureCanonicalOrderFromOrders(orderID); err != nil {
 		return err
 	}
+	if err := l.recordOutcome(orderID, pending.stageIndex, state.StageOutcome{
+		State: string(config.StageStateReject), Action: string(config.StageActionExit),
+	}); err != nil {
+		return err
+	}
 	if strings.TrimSpace(pending.worktreeName) != "" {
 		_ = l.deps.Worktree.Cleanup(pending.worktreeName, worktree.CleanupOpts{Force: true})
 	}
@@ -150,12 +157,27 @@ func (l *Loop) controlRequestChanges(orderID, feedback string) error {
 	}
 
 	trimmedFeedback := strings.TrimSpace(feedback)
+	if !l.orderGated() || !l.config.Review.IsExternal(pending.stage.TaskKey, pending.stage.Skill) {
+		action := config.StageActionExit
+		if l.orderGated() {
+			action = config.StageActionRetry
+		}
+		if err := l.recordOutcome(orderID, pending.stageIndex, state.StageOutcome{
+			State: string(config.StageStateReject), Action: string(action), Feedback: trimmedFeedback,
+		}); err != nil {
+			return err
+		}
+	}
 	limitReached := ""
 	if l.orderGated() {
 		if l.config.Review.IsExternal(pending.stage.TaskKey, pending.stage.Skill) {
 			return l.controlStageComplete(orderID, pending.stage.TaskKey, feedback, true)
 		}
-		round, limit, err := l.rerunForChanges(pending, trimmedFeedback)
+		round, limit, err := l.rerunForChanges(&cookHandle{
+			cookIdentity: pending.cookIdentity,
+			worktreeName: pending.worktreeName,
+			session:      &adoptedSession{id: pending.sessionID, status: "completed"},
+		}, trimmedFeedback)
 		if err != nil || round > 0 {
 			return err
 		}
@@ -203,23 +225,23 @@ func (l *Loop) controlRequestChanges(orderID, feedback string) error {
 	return nil
 }
 
-// rerunForChanges sends a parked stage of a gated order back to pending at the
+// rerunForChanges sends a parked or just-finished stage back to pending at the
 // same index, so it re-dispatches into the same worktree with the feedback
 // appended to its prompt. Returns the round started, or 0 when the
 // [review] max_rework limit is reached.
-func (l *Loop) rerunForChanges(pending *pendingReviewCook, feedback string) (round, limit int, err error) {
+func (l *Loop) rerunForChanges(cook *cookHandle, feedback string) (round, limit int, err error) {
 	limit = l.config.Review.MaxReworkRounds()
 	err = l.mutateOrdersState(func(orders *OrdersFile) (bool, error) {
 		for i := range orders.Orders {
 			order := &orders.Orders[i]
-			if order.ID != pending.orderID || pending.stageIndex >= len(order.Stages) {
+			if order.ID != cook.orderID || cook.stageIndex >= len(order.Stages) {
 				continue
 			}
 			if reworkRounds(*order) >= limit {
 				return false, nil
 			}
 			round = reworkRounds(*order) + 1
-			stage := &order.Stages[pending.stageIndex]
+			stage := &order.Stages[cook.stageIndex]
 			line := fmt.Sprintf("Changes requested (round %d of %d)", round, limit)
 			if feedback != "" {
 				line += ": " + feedback
@@ -250,23 +272,18 @@ func (l *Loop) rerunForChanges(pending *pendingReviewCook, feedback string) (rou
 		reason += ": " + feedback
 	}
 	if err := l.emitEventChecked(ingest.EventStageReviewChangesRequested, map[string]any{
-		"order_id":    pending.orderID,
-		"stage_index": pending.stageIndex,
+		"order_id":    cook.orderID,
+		"stage_index": cook.stageIndex,
 		"reason":      reason,
 		"rerun":       true,
 	}); err != nil {
 		return 0, limit, err
 	}
-	if err := l.mirrorLegacyOrderFromCanonical(pending.orderID); err != nil {
+	if err := l.mirrorLegacyOrderFromCanonical(cook.orderID); err != nil {
 		return 0, limit, err
 	}
 	if err := l.syncPendingReviewProjection(); err != nil {
 		return 0, limit, err
-	}
-	cook := &cookHandle{
-		cookIdentity: pending.cookIdentity,
-		worktreeName: pending.worktreeName,
-		session:      &adoptedSession{id: pending.sessionID, status: "completed"},
 	}
 	l.emitReviewDecision(cook, "changes_requested", outcome, feedback, "")
 	l.cmds.ackMessage = "changes requested; " + outcome

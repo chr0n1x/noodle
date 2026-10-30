@@ -165,6 +165,41 @@ noodle event emit <type> [flags]
 
 ---
 
+## `noodle order`
+
+Complete or resolve the stage an order is held or parked at. The stage name must match that stage; the loop refuses any other name.
+
+### `noodle order complete`
+
+Submit an external review for a stage held in `[review] external_stages`.
+
+```
+noodle order <order_id> complete <stage> --file <review.md> [--reject] [--no-wait]
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--file` | string | — | Markdown file with the review (required) |
+| `--reject` | bool | `false` | Send the review back as rework |
+| `--no-wait` | bool | `false` | Do not wait for the loop to acknowledge |
+
+### `noodle order resolve`
+
+Give a parked or held stage a verdict and an action (see [`[stages.<task>]`](/reference/configuration) for the actions).
+
+```
+noodle order <order_id> resolve <stage> <accept|reject> <promote|exit|park|retry|retry-previous> [--feedback-file <f>] [--no-wait]
+```
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--feedback-file` | string | — | File with feedback, recorded on the stage and shown to later stages |
+| `--no-wait` | bool | `false` | Do not wait for the loop to acknowledge |
+
+The control API takes the same command: `{"action": "resolve", "order_id": "14", "task_key": "adversarial-review", "state": "reject", "do": "retry-previous", "prompt": "<feedback>"}`. `approve`, `reject` and `request-changes` record `accept promote`, `reject exit` and `reject retry` (`reject exit` when the order is ungated).
+
+---
+
 ## `noodle reset`
 
 Clear all runtime state. Removes and recreates the runtime directory.

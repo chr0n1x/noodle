@@ -239,10 +239,7 @@ func reduceStageCompleted(current state.State, event ingest.StateEvent) (state.S
 	order.Stages[payload.StageIndex] = stage
 
 	if allStagesTerminal(order) {
-		order.Status = state.OrderCompleted
-		if payload.HoldForPublish {
-			order.Status = state.OrderAwaitingPublish
-		}
+		order.Status = endStatus(order, payload.HoldForPublish)
 	}
 
 	next.Orders[payload.OrderID] = order
@@ -255,7 +252,7 @@ func reduceStageCompleted(current state.State, event ingest.StateEvent) (state.S
 		}
 		return next, []Effect{effect}, nil
 	}
-	if order.Status == state.OrderCompleted {
+	if order.Status == state.OrderCompleted || order.Status == state.OrderFailed {
 		e0, err := makeEffect(event, 0, EffectWriteProjection, map[string]any{"order_id": payload.OrderID})
 		if err != nil {
 			return current, nil, fmt.Errorf("reduce stage_completed projection: %w", err)
@@ -567,7 +564,7 @@ func reduceMergeCompleted(current state.State, event ingest.StateEvent) (state.S
 	order.UpdatedAt = event.Timestamp
 
 	if allStagesTerminal(order) {
-		order.Status = state.OrderCompleted
+		order.Status = endStatus(order, false)
 	} else {
 		order.Status = state.OrderActive
 		nextStageIndex := payload.StageIndex + 1
@@ -875,6 +872,19 @@ func stageMergeable(stage state.StageNode, payload orderStagePayload) bool {
 		return *payload.Mergeable
 	}
 	return latestWorktreeName(stage) != ""
+}
+
+// endStatus is the status of an order whose stages are all terminal: failed
+// when a stage was rejected and let through, otherwise completed, or awaiting
+// publish when hold is set.
+func endStatus(order state.OrderNode, hold bool) state.OrderLifecycleStatus {
+	if _, rejected := state.RejectedThrough(order); rejected {
+		return state.OrderFailed
+	}
+	if hold {
+		return state.OrderAwaitingPublish
+	}
+	return state.OrderCompleted
 }
 
 func allStagesTerminal(order state.OrderNode) bool {

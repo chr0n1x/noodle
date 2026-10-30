@@ -51,7 +51,8 @@ type ReviewConfig struct {
 	// feedback back to an execute stage for one order. Unset means 2.
 	MaxRework *int `toml:"max_rework"`
 	// ExtraStages are skills added after each pending quality stage when
-	// scheduled orders are promoted, e.g. ["adversarial-review"].
+	// scheduled orders are promoted, or at the end of an unstarted order
+	// with no quality stage, e.g. ["adversarial-review", "reflect"].
 	ExtraStages []string `toml:"extra_stages"`
 	// PublishAction is how approve-and-publish delivers an order's kept
 	// work: empty merges it locally, "draft-pr" opens a draft PR from
@@ -136,7 +137,7 @@ func forkDiagnostics(config Config) []ConfigDiagnostic {
 			Code:      DiagnosticCodeReviewAutoVerifyQualityUngated,
 		})
 	}
-	return out
+	return append(out, outcomeDiagnostics(config)...)
 }
 
 // PublishActionDraftPR is the publish_action value that opens a draft PR.

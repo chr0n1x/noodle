@@ -23,8 +23,7 @@ Use cases:
       "rationale": "foundation-before-feature: core infra needed by all other work",
       "stages": [
         {"do": "execute", "with": "codex", "model": "gpt-5.4", "runtime": "process"},
-        {"do": "quality", "with": "claude", "model": "claude-opus-4-6", "runtime": "process"},
-        {"do": "reflect", "with": "claude", "model": "claude-opus-4-6", "runtime": "process"}
+        {"do": "quality", "with": "claude", "model": "claude-opus-4-6", "runtime": "process"}
       ]
     }
   ]

@@ -757,7 +757,7 @@ func TestCycleBootstrapsScheduleUsesRegistrySkill(t *testing.T) {
 		t.Fatalf("spawn skill = %q", rt.calls[0].Skill)
 	}
 	expectedMise := filepath.Join(runtimeDir, "mise.json")
-	if !strings.Contains(rt.calls[0].Prompt, "Use Skill(schedule) to refresh the schedule from "+expectedMise+".") {
+	if !strings.Contains(rt.calls[0].Prompt, "Follow the schedule skill in your system prompt (it is already loaded; do not call the Skill tool) to refresh the schedule from "+expectedMise+".") {
 		t.Fatalf("spawn prompt missing skill invocation: %q", rt.calls[0].Prompt)
 	}
 	expectedOrdersNext := filepath.Join(runtimeDir, "orders-next.json")

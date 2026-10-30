@@ -1635,6 +1635,18 @@ foreignObject.node.node-clickable .tree-node-card:active {
     color 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   letter-spacing: 0.5px;
 }
+button.stage-item {
+  width: 100%;
+  background: none;
+  border-top: 0;
+  border-right: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+div.stage-item {
+  cursor: default;
+}
 .stage-item:hover {
   background: var(--color-bg-surface);
   border-left-color: var(--color-text-tertiary);

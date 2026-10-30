@@ -41,7 +41,7 @@ func TestApplyExtraStagesInsertsAfterPendingQuality(t *testing.T) {
 
 	want := map[string][]string{
 		"a":            {"execute", "quality", "adversarial-review", "reflect"},
-		"no-quality":   {"execute"},
+		"no-quality":   {"execute", "adversarial-review"},
 		"has-it":       {"quality", "adversarial-review"},
 		"quality-done": {"quality"},
 	}
@@ -56,6 +56,40 @@ func TestApplyExtraStagesInsertsAfterPendingQuality(t *testing.T) {
 	}
 	if len(orders.Orders[0].Stages) != 3 {
 		t.Errorf("input order was mutated: %v", stageKeys(orders.Orders[0]))
+	}
+}
+
+func TestApplyExtraStagesAppendsToUnstartedOrderWithoutQuality(t *testing.T) {
+	orders := OrdersFile{Orders: []Order{
+		{ID: "review-only", Stages: []Stage{
+			{TaskKey: "adversarial-review", Skill: "adversarial-review", Provider: "claude", Model: "sonnet", Status: StageStatusPending},
+		}},
+		{ID: "started", Stages: []Stage{
+			{TaskKey: "execute", Status: StageStatusCompleted},
+			{TaskKey: "adversarial-review", Status: StageStatusPending},
+		}},
+		{ID: scheduleOrderID, Stages: []Stage{{TaskKey: "schedule", Status: StageStatusPending}}},
+		{ID: scheduleBootstrapOrderID, Stages: []Stage{{TaskKey: "oops", Status: StageStatusPending}}},
+		{ID: "empty"},
+	}}
+
+	got, _ := applyExtraStages(orders, []string{"adversarial-review", "reflect"}, knowAll)
+
+	want := map[string][]string{
+		"review-only":            {"adversarial-review", "reflect"},
+		"started":                {"execute", "adversarial-review"},
+		scheduleOrderID:          {"schedule"},
+		scheduleBootstrapOrderID: {"oops"},
+		"empty":                  {},
+	}
+	for _, order := range got.Orders {
+		if k := stageKeys(order); !equalStrings(k, want[order.ID]) {
+			t.Errorf("order %s stages = %v, want %v", order.ID, k, want[order.ID])
+		}
+	}
+	added := got.Orders[0].Stages[1]
+	if added.Skill != "reflect" || added.Provider != "claude" || added.Model != "sonnet" || added.Status != StageStatusPending {
+		t.Errorf("added stage = %+v", added)
 	}
 }
 
@@ -121,6 +155,40 @@ func TestPromotionAppliesExtraStages(t *testing.T) {
 		t.Fatalf("orders = %d", len(orders.Orders))
 	}
 	if k := stageKeys(orders.Orders[0]); !equalStrings(k, []string{"execute", "quality", "adversarial-review"}) {
+		t.Errorf("stages = %v", k)
+	}
+}
+
+func TestPromotionAppendsExtraStagesToOrderWithoutQuality(t *testing.T) {
+	logger, _ := newTestLogger()
+	tc := newTestLoop(t, logger, func(o *testLoopOpts) {
+		brief := mise.Brief{Backlog: []adapter.BacklogItem{{ID: "1", Title: "test", Status: "open"}}}
+		o.brief = &brief
+	})
+	tc.loop.config.Review.ExtraStages = []string{"adversarial-review", "reflect"}
+	tc.loop.registry = taskreg.NewFromSkills([]skill.SkillMeta{
+		{Name: "schedule", Path: "/skills/schedule", Frontmatter: skill.Frontmatter{Schedule: "When queue is empty"}},
+		{Name: "adversarial-review", Path: "/skills/adversarial-review", Frontmatter: skill.Frontmatter{Schedule: "After quality"}},
+		{Name: "reflect", Path: "/skills/reflect", Frontmatter: skill.Frontmatter{Schedule: "After quality"}},
+	})
+	ordersNextPath := filepath.Join(tc.runtimeDir, "orders-next.json")
+	compactJSON := []byte(`{"orders":[{"id":"o1","title":"t","stages":[{"do":"adversarial-review","with":"claude","model":"m"}]}]}`)
+	if err := os.WriteFile(ordersNextPath, compactJSON, 0o644); err != nil {
+		t.Fatalf("write orders-next: %v", err)
+	}
+	tc.loop.deps.OrdersNextFile = ordersNextPath
+
+	if err := tc.loop.Cycle(context.Background()); err != nil {
+		t.Fatalf("cycle: %v", err)
+	}
+	orders, err := tc.loop.currentOrders()
+	if err != nil {
+		t.Fatalf("orders: %v", err)
+	}
+	if len(orders.Orders) != 1 {
+		t.Fatalf("orders = %d", len(orders.Orders))
+	}
+	if k := stageKeys(orders.Orders[0]); !equalStrings(k, []string{"adversarial-review", "reflect"}) {
 		t.Errorf("stages = %v", k)
 	}
 }

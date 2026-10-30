@@ -9,8 +9,10 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/poteto/noodle/config"
 	"github.com/poteto/noodle/event"
 	"github.com/poteto/noodle/internal/ingest"
+	"github.com/poteto/noodle/internal/state"
 	"github.com/poteto/noodle/worktree"
 )
 
@@ -92,6 +94,23 @@ func (l *Loop) orderWorkBranch(orderID string) (string, bool) {
 	return rec.Branches[len(rec.Branches)-1], true
 }
 
+// forgetOrderWork drops the kept-work record for orderID and leaves its
+// branches and worktrees in place. A new order promoted under the ID of an
+// earlier one calls it, so its first stage starts from the default base
+// instead of the earlier order's work.
+func (l *Loop) forgetOrderWork(orderID string) {
+	records := l.loadOrderWork()
+	if _, ok := records[orderID]; !ok {
+		return
+	}
+	delete(records, orderID)
+	if err := l.saveOrderWork(records); err != nil {
+		l.logger.Warn("save order work failed", "order", orderID, "error", err)
+		return
+	}
+	l.logger.Info("dropped kept work of an earlier order with the same id", "order", orderID)
+}
+
 // releaseOrderWork deletes an order's kept branches and worktrees, after its
 // work was published or the user rejected it.
 func (l *Loop) releaseOrderWork(orderID string) {
@@ -134,6 +153,11 @@ func (l *Loop) controlApprove(orderID string) error {
 		return err
 	}
 	if err := l.ensureCanonicalOrderFromOrders(orderID); err != nil {
+		return err
+	}
+	if err := l.recordOutcome(orderID, pending.stageIndex, state.StageOutcome{
+		State: string(config.StageStateAccept), Action: string(config.StageActionPromote),
+	}); err != nil {
 		return err
 	}
 	cook := &cookHandle{

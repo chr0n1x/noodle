@@ -8,7 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/poteto/noodle/config"
 	"github.com/poteto/noodle/internal/ingest"
+	"github.com/poteto/noodle/internal/state"
 )
 
 const externalReviewReasonPrefix = "external review"
@@ -150,6 +152,13 @@ func (l *Loop) controlStageComplete(orderID, stage, review string, reject bool) 
 		worktreeName: pending.worktreeName,
 		worktreePath: pending.worktreePath,
 		session:      &adoptedSession{id: pending.sessionID, status: "completed"},
+	}
+	verdict := state.StageOutcome{State: string(config.StageStateAccept), Action: string(config.StageActionPromote), Feedback: strings.TrimSpace(review)}
+	if reject {
+		verdict.State, verdict.Action = string(config.StageStateReject), string(config.StageActionRetryPrevious)
+	}
+	if err := l.recordOutcome(orderID, pending.stageIndex, verdict); err != nil {
+		return err
 	}
 
 	if reject {

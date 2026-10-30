@@ -43,7 +43,7 @@ describe("Dashboard", () => {
     expect(mockNavigate).toHaveBeenCalledWith({ to: "/actor/$id", params: { id: "s1" } });
   });
 
-  it("clicking a completed session row navigates to review route", async () => {
+  it("clicking a completed session row opens its transcript", async () => {
     const user = userEvent.setup();
     setSnapshot({
       active: [],
@@ -54,7 +54,7 @@ describe("Dashboard", () => {
     render(<Dashboard />);
     await user.click(screen.getByText("s2"));
 
-    expect(mockNavigate).toHaveBeenCalledWith({ to: "/reviews" });
+    expect(mockNavigate).toHaveBeenCalledWith({ to: "/actor/$id", params: { id: "s2" } });
   });
 
   it("clicking a pending-review session row navigates to review route", async () => {

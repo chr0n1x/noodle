@@ -236,3 +236,62 @@ func TestOrderCompleteErrorAckFails(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestOrderResolveWritesResolveCommand(t *testing.T) {
+	app, runtimeDir := writeReviewFixture(t)
+	root := newOrderCmd(app)
+	root.SetArgs([]string{"14", "resolve", "adversarial-review", "reject", "retry-previous", "--feedback-file", writeReviewFile(t, "you hallucinated"), "--no-wait"})
+	out := captureStdout(t, func() {
+		if err := root.Execute(); err != nil {
+			t.Fatalf("execute: %v", err)
+		}
+	})
+	if !strings.Contains(out, "queued") {
+		t.Fatalf("output = %q, want queued notice", out)
+	}
+	cmd := readControlCommand(t, runtimeDir)
+	if cmd.Action != "resolve" || cmd.OrderID != "14" || cmd.TaskKey != "adversarial-review" || cmd.State != "reject" ||
+		cmd.Do != "retry-previous" || cmd.Prompt != "you hallucinated" || cmd.At.IsZero() {
+		t.Fatalf("command = %+v", cmd)
+	}
+}
+
+func TestOrderResolveFeedbackIsOptional(t *testing.T) {
+	app, runtimeDir := writeReviewFixture(t)
+	root := newOrderCmd(app)
+	root.SetArgs([]string{"14", "resolve", "execute", "accept", "promote", "--no-wait"})
+	captureStdout(t, func() {
+		if err := root.Execute(); err != nil {
+			t.Fatalf("execute: %v", err)
+		}
+	})
+	if cmd := readControlCommand(t, runtimeDir); cmd.State != "accept" || cmd.Do != "promote" || cmd.Prompt != "" {
+		t.Fatalf("command = %+v", cmd)
+	}
+}
+
+func TestOrderResolveRejectsBadArgs(t *testing.T) {
+	for _, args := range [][]string{
+		{"14", "resolve", "execute", "maybe", "promote"},
+		{"14", "resolve", "execute", "accept", "retry-last"},
+		{"14", "resolve", "execute", "accept"},
+	} {
+		app, _ := writeReviewFixture(t)
+		root := newOrderCmd(app)
+		root.SetArgs(append(args, "--no-wait"))
+		root.SilenceUsage, root.SilenceErrors = true, true
+		if err := root.Execute(); err == nil {
+			t.Fatalf("%v: want an error", args)
+		}
+	}
+}
+
+func TestOrderCompleteStillRequiresFile(t *testing.T) {
+	app, _ := writeReviewFixture(t)
+	root := newOrderCmd(app)
+	root.SetArgs([]string{"5", "complete", "quality", "--no-wait"})
+	root.SilenceUsage, root.SilenceErrors = true, true
+	if err := root.Execute(); err == nil {
+		t.Fatal("complete without --file should fail")
+	}
+}

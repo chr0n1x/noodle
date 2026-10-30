@@ -54,6 +54,9 @@ func codexBaseArgs(req DispatchRequest) []string {
 	if strings.TrimSpace(req.Model) != "" {
 		args = append(args, "--model", req.Model)
 	}
+	if p := strings.TrimSpace(req.ModelProvider); p != "" {
+		args = append(args, "-c", fmt.Sprintf("model_provider=%q", p))
+	}
 	return args
 }
 
@@ -116,16 +119,18 @@ func buildDispatchEnv(req DispatchRequest) []string {
 	return env
 }
 
-func composePrompts(provider, requestPrompt, preamble, skillSystemPrompt string) (systemPrompt, finalPrompt string) {
+func composePrompts(provider, requestPrompt, preamble, skillSystemPrompt, stageSystemPrompt string) (systemPrompt, finalPrompt string) {
 	finalPrompt = requestPrompt
-	fullSystemPrompt := stringx.JoinNonEmpty("\n\n", preamble, skillSystemPrompt)
+	fullSystemPrompt := stringx.JoinNonEmpty("\n\n", preamble, skillSystemPrompt, stageSystemPrompt)
 	if strings.EqualFold(provider, "claude") {
 		systemPrompt = fullSystemPrompt
 		return systemPrompt, finalPrompt
 	}
-	// Codex loads skills natively via Skill(name) — only inline the preamble.
-	if strings.EqualFold(provider, "codex") && strings.TrimSpace(preamble) != "" {
-		finalPrompt = requestPrompt + "\n\n---\n\n" + preamble
+	// Codex loads skills natively via Skill(name) — only inline the preamble
+	// and the stage's system prompt.
+	inline := stringx.JoinNonEmpty("\n\n", preamble, stageSystemPrompt)
+	if strings.EqualFold(provider, "codex") && inline != "" {
+		finalPrompt = requestPrompt + "\n\n---\n\n" + inline
 	}
 	return systemPrompt, finalPrompt
 }

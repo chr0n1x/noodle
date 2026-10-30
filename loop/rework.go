@@ -44,6 +44,13 @@ func reworkRounds(order Order) int {
 // advancing to the new execute stage. Returns the round started, or 0 when the
 // [review] max_rework limit is reached or no execute stage precedes the review.
 func (l *Loop) startRework(cook *cookHandle, review string) (round, limit int, err error) {
+	return l.reworkFrom(cook, review, func(s Stage) bool { return s.TaskKey == "execute" })
+}
+
+// reworkFrom is startRework for the nearest earlier stage matching target: a
+// copy of that stage runs with the review as its prompt, then a copy of the
+// rejecting stage.
+func (l *Loop) reworkFrom(cook *cookHandle, review string, target func(Stage) bool) (round, limit int, err error) {
 	limit = l.config.Review.MaxReworkRounds()
 	err = l.mutateOrdersState(func(orders *OrdersFile) (bool, error) {
 		for i := range orders.Orders {
@@ -56,11 +63,14 @@ func (l *Loop) startRework(cook *cookHandle, review string) (round, limit int, e
 			}
 			round = reworkRounds(*order) + 1
 			held := order.Stages[cook.stageIndex]
-			execute := Stage{TaskKey: "execute", Skill: "execute", Status: StageStatusPending, Extra: reworkExtra(round)}
+			var execute Stage
 			found := false
 			for j := cook.stageIndex - 1; j >= 0 && !found; j-- {
-				if order.Stages[j].TaskKey == "execute" {
-					execute.Provider, execute.Model, execute.Runtime = order.Stages[j].Provider, order.Stages[j].Model, order.Stages[j].Runtime
+				if prev := order.Stages[j]; target(prev) {
+					execute = Stage{
+						TaskKey: prev.TaskKey, Skill: nonEmpty(prev.Skill, prev.TaskKey), Status: StageStatusPending, Extra: reworkExtra(round),
+						Provider: prev.Provider, Model: prev.Model, Runtime: prev.Runtime,
+					}
 					found = true
 				}
 			}

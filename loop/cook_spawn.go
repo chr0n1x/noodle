@@ -61,7 +61,10 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 
 	created, err := l.ensureWorktree(name, cand.OrderID)
 	if err != nil {
-		return fmt.Errorf("create worktree %s: %w", name, err)
+		// Fails this order only; the loop keeps running the others.
+		return l.handleCookDispatchFailure(cand, stage, name, false,
+			dispatchAttemptID(cand.OrderID, cand.StageIndex, opts.attempt),
+			fmt.Errorf("create worktree %s: %w", name, err))
 	}
 
 	// Guard: only one cook may use a worktree at a time.
@@ -82,24 +85,30 @@ func (l *Loop) spawnCook(ctx context.Context, cand dispatchCandidate, order Orde
 		}
 	}
 	prompt := buildCookPrompt(cand.OrderID, stage, order.Plan, order.Title, order.Rationale, resumePrompt)
+	prompt = stringx.JoinNonEmpty("\n\n", prompt, outcomeContext(order.Stages, cand.StageIndex))
 	if handled, err := l.holdExternalReview(cand, order, name, worktreePath, prompt); handled {
 		return err
 	}
 
-	prompt = skillWordingForProvider(prompt, nonEmpty(stage.Provider, l.config.Routing.Defaults.Provider), stage.Skill)
+	routed := routeStage(stage, l.config.Stages)
+	stageConfig := l.config.StageConfig(stage.TaskKey)
+	provider := nonEmpty(routed.Provider, l.config.Routing.Defaults.Provider)
+	prompt = skillWordingForProvider(prompt, provider, stage.Skill)
 	taskType, _ := l.registry.ByKey(stage.TaskKey)
 	req := loopruntime.DispatchRequest{
-		Name:         name,
-		Prompt:       prompt,
-		Provider:     nonEmpty(stage.Provider, l.config.Routing.Defaults.Provider),
-		Model:        nonEmpty(stage.Model, l.config.Routing.Defaults.Model),
-		Skill:        stage.Skill,
-		WorktreePath: worktreePath,
-		TaskKey:      taskType.Key,
-		Runtime:      nonEmpty(stage.Runtime, "process"),
-		DisplayName:  opts.displayName,
-		Title:        order.Title,
-		RetryCount:   opts.attempt,
+		Name:              name,
+		Prompt:            prompt,
+		Provider:          provider,
+		Model:             nonEmpty(routed.Model, l.config.Routing.Defaults.Model),
+		ModelProvider:     stageConfig.Provider,
+		StageSystemPrompt: stageConfig.SystemPrompt,
+		Skill:             stage.Skill,
+		WorktreePath:      worktreePath,
+		TaskKey:           taskType.Key,
+		Runtime:           nonEmpty(stage.Runtime, "process"),
+		DisplayName:       opts.displayName,
+		Title:             order.Title,
+		RetryCount:        opts.attempt,
 	}
 	attemptID := dispatchAttemptID(cand.OrderID, cand.StageIndex, opts.attempt)
 	l.emitEvent(ingest.EventDispatchRequested, map[string]any{

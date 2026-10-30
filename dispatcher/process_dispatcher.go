@@ -151,7 +151,7 @@ func (d *ProcessDispatcher) prepareSessionDir(
 	}
 
 	preamble := buildSessionPreamble()
-	systemPrompt, composedPrompt := composePrompts(req.Provider, req.Prompt, preamble, skillBundle.SystemPrompt)
+	systemPrompt, composedPrompt := composePrompts(req.Provider, req.Prompt, preamble, skillBundle.SystemPrompt, req.StageSystemPrompt)
 
 	if _, err := writePromptFiles(sessionDir, promptPath, req.Prompt, composedPrompt); err != nil {
 		return nil, loadedSkill{}, "", "", err

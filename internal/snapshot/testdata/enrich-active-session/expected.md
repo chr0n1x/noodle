@@ -63,7 +63,8 @@ source_hash: c23453896ff406677e4f0eebbb2966d286eb27b4c34ded41ed363741476ccd66
           "provider": "claude",
           "model": "claude-sonnet-4-6",
           "status": "active",
-          "session_id": "cook-active"
+          "session_id": "cook-active",
+          "state": "in-progress"
         }
       ],
       "status": "active"

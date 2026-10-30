@@ -49,3 +49,16 @@ func TestParseControlRequestAcceptsApproveAndPublish(t *testing.T) {
 		t.Fatalf("cmd = %+v", cmd)
 	}
 }
+
+func TestParseControlRequestAcceptsResolve(t *testing.T) {
+	cmd, err := parseControlRequest("resolve", controlRequest{
+		Action: "resolve", OrderID: "14", TaskKey: " adversarial-review ", State: " reject ", Do: " retry-previous ", Prompt: "you hallucinated",
+	})
+	if err != nil {
+		t.Fatalf("parseControlRequest: %v", err)
+	}
+	if cmd.Action != "resolve" || cmd.OrderID != "14" || cmd.TaskKey != "adversarial-review" || cmd.State != "reject" ||
+		cmd.Do != "retry-previous" || cmd.Prompt != "you hallucinated" {
+		t.Fatalf("cmd = %+v", cmd)
+	}
+}

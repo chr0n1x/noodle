@@ -221,6 +221,8 @@ type controlRequest struct {
 	Provider string `json:"provider,omitempty"`
 	Model    string `json:"model,omitempty"`
 	Skill    string `json:"skill,omitempty"`
+	State    string `json:"state,omitempty"`
+	Do       string `json:"do,omitempty"`
 }
 
 func (s *Server) handleControl(w http.ResponseWriter, r *http.Request) {

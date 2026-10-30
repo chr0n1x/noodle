@@ -13,17 +13,19 @@ const (
 
 // Config is the top-level .noodle.toml contract for runtime wiring.
 type Config struct {
-	Adapters    map[string]AdapterConfig `toml:"adapters"`
-	Routing     RoutingConfig            `toml:"routing"`
-	Skills      SkillsConfig             `toml:"skills"`
-	Mode        string                   `toml:"mode"`
-	Concurrency ConcurrencyConfig        `toml:"concurrency"`
-	Agents      AgentsConfig             `toml:"agents"`
-	Runtime     RuntimeConfig            `toml:"runtime"`
-	Server      ServerConfig             `toml:"server"`
-	Worktree    WorktreeConfig           `toml:"worktree"`
-	Delivery    DeliveryConfig           `toml:"delivery"`
-	Review      ReviewConfig             `toml:"review"`
+	Adapters    map[string]AdapterConfig      `toml:"adapters"`
+	Routing     RoutingConfig                 `toml:"routing"`
+	Skills      SkillsConfig                  `toml:"skills"`
+	Mode        string                        `toml:"mode"`
+	Concurrency ConcurrencyConfig             `toml:"concurrency"`
+	Agents      AgentsConfig                  `toml:"agents"`
+	Runtime     RuntimeConfig                 `toml:"runtime"`
+	Server      ServerConfig                  `toml:"server"`
+	Worktree    WorktreeConfig                `toml:"worktree"`
+	Delivery    DeliveryConfig                `toml:"delivery"`
+	Review      ReviewConfig                  `toml:"review"`
+	Stages      map[string]StageOutcomeConfig `toml:"stages"`
+	Hooks       HooksConfig                   `toml:"hooks"`
 }
 
 type AdapterConfig struct {
