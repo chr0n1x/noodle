@@ -28,23 +28,13 @@ func (noOpWorktree) HasUnmergedCommits(string) (bool, error)       { return fals
 func defaultDependencies(projectDir, runtimeDir, noodleBin string, cfg config.Config, logger *slog.Logger, sink dispatcher.SessionEventSink) Dependencies {
 	resolver := skill.Resolver{SearchPaths: cfg.Skills.Paths}
 	local := dispatcher.NewProcessDispatcher(dispatcher.ProcessDispatcherConfig{
-		ProjectDir:    projectDir,
-		RuntimeDir:    runtimeDir,
-		NoodleBin:     noodleBin,
-		SkillResolver: resolver,
-		RuntimeKind:   "process",
-		Sink:          sink,
-		ProviderConfigs: dispatcher.ProviderConfigs{
-			Claude: dispatcher.ProviderConfig{
-				Path:          cfg.Agents.Claude.Path,
-				Args:          cfg.Agents.Claude.Args,
-				ExitAfterTurn: cfg.Agents.Claude.ExitAfterTurn,
-			},
-			Codex: dispatcher.ProviderConfig{
-				Path: cfg.Agents.Codex.Path,
-				Args: cfg.Agents.Codex.Args,
-			},
-		},
+		ProjectDir:      projectDir,
+		RuntimeDir:      runtimeDir,
+		NoodleBin:       noodleBin,
+		SkillResolver:   resolver,
+		RuntimeKind:     "process",
+		Sink:            sink,
+		ProviderConfigs: ProviderConfigsFrom(cfg.Agents),
 	})
 	runtimes := map[string]loopruntime.Runtime{
 		"process": loopruntime.NewProcessRuntime(local, runtimeDir, cfg.Runtime.Process.MaxConcurrent),
@@ -106,4 +96,15 @@ func runtimeEnabled(available []string, kind string) bool {
 		}
 	}
 	return false
+}
+
+// ProviderConfigsFrom maps every [agents.<provider>] table to dispatcher config.
+func ProviderConfigsFrom(agents config.AgentsConfig) dispatcher.ProviderConfigs {
+	out := make(dispatcher.ProviderConfigs, len(config.Providers))
+	for _, name := range config.Providers {
+		p := agents.For(name)
+		inherit, _ := agents.InheritEnvFor(name)
+		out[name] = dispatcher.ProviderConfig{Path: p.Path, Args: p.Args, ExitAfterTurn: p.ExitAfterTurn, InheritEnv: inherit}
+	}
+	return out
 }

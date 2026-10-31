@@ -97,6 +97,7 @@ func (d *ProcessDispatcher) Dispatch(ctx context.Context, req DispatchRequest) (
 
 	session := newProcessSession(processSessionConfig{
 		id:            sessionID,
+		provider:      providerKey(req.Provider),
 		process:       process,
 		eventWriter:   eventWriter,
 		canonicalPath: canonicalPath,
@@ -196,21 +197,39 @@ func (d *ProcessDispatcher) startSessionProcess(
 	return controller, process, nil
 }
 
-// closeStdinAfterTurn reports whether a Claude session's stdin is closed when
-// its turn finishes: only with [agents.claude] exit_after_turn, and never for
-// keep-alive sessions such as the scheduler.
+// closeStdinAfterTurn reports whether a steerable session's stdin is closed
+// when its turn finishes: only with [agents.<provider>] exit_after_turn, and
+// never for keep-alive sessions such as the scheduler.
 func (d *ProcessDispatcher) closeStdinAfterTurn(req DispatchRequest) bool {
-	return d.providerConfigs.Claude.ExitAfterTurn && !req.KeepAlive
+	return d.providerConfigs[providerKey(req.Provider)].ExitAfterTurn && !req.KeepAlive
 }
 
-// configureStdin sets up stdin handling for the started process. For Claude,
-// creates a controller that owns stdin for live steering and sends the prompt
-// as the first stream-json user message. For other providers (codex), writes
-// the prompt to stdin and closes it.
+// steerable reports whether a provider reads stream-json user messages on
+// stdin, so a running session can be steered.
+func steerable(provider string) bool {
+	switch providerKey(provider) {
+	case "claude", "maki":
+		return true
+	}
+	return false
+}
+
+// providerKey normalizes a provider name, defaulting to claude.
+func providerKey(provider string) string {
+	if p := stringx.Normalize(provider); p != "" {
+		return p
+	}
+	return "claude"
+}
+
+// configureStdin sets up stdin handling for the started process. For
+// stream-json providers (claude, maki), creates a controller that owns stdin
+// for live steering and sends the prompt as the first user message. For the
+// rest, writes the prompt to stdin and closes it.
 func (d *ProcessDispatcher) configureStdin(
 	ctx context.Context, process *ProcessHandle, provider, composedPrompt string, closeOnIdle bool,
 ) (*claudeController, error) {
-	if stringx.Normalize(provider) == "codex" {
+	if !steerable(provider) {
 		go func() {
 			_, _ = io.WriteString(process.Stdin(), composedPrompt)
 			_ = process.Stdin().Close()
@@ -242,6 +261,18 @@ func (d *ProcessDispatcher) buildCmd(req DispatchRequest, systemPrompt string) (
 		args = append(args, extraArgs...)
 		return exec.Command(binary, args...), nil
 
+	case "maki":
+		args := append(makiBaseArgs(req, systemPrompt), extraArgs...)
+		return exec.Command(binary, args...), nil
+
+	case "pi", "pig":
+		args := append(piBaseArgs(req, systemPrompt), extraArgs...)
+		return exec.Command(binary, args...), nil
+
+	case "copilot":
+		args := append(copilotBaseArgs(req), extraArgs...)
+		return exec.Command(binary, args...), nil
+
 	default: // claude
 		args := claudeBaseArgs(req, systemPrompt)
 		// Replace -p (pipe mode) with --input-format stream-json for
@@ -266,33 +297,18 @@ func (d *ProcessDispatcher) buildCustomRuntimeCmd(req DispatchRequest, runtimeCm
 }
 
 func (d *ProcessDispatcher) resolveAgentBinary(provider string) string {
-	switch stringx.Normalize(provider) {
-	case "codex":
-		if path := strings.TrimSpace(d.providerConfigs.Codex.Path); path != "" {
-			candidate := filepath.Join(filex.ExpandHome(path), "codex")
-			if _, err := os.Stat(candidate); err == nil {
-				return candidate
-			}
+	name := providerKey(provider)
+	if path := strings.TrimSpace(d.providerConfigs[name].Path); path != "" {
+		candidate := filepath.Join(filex.ExpandHome(path), name)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
 		}
-		return "codex"
-	default:
-		if path := strings.TrimSpace(d.providerConfigs.Claude.Path); path != "" {
-			candidate := filepath.Join(filex.ExpandHome(path), "claude")
-			if _, err := os.Stat(candidate); err == nil {
-				return candidate
-			}
-		}
-		return "claude"
 	}
+	return name
 }
 
 func (d *ProcessDispatcher) resolveExtraArgs(provider string) []string {
-	switch stringx.Normalize(provider) {
-	case "codex":
-		return d.providerConfigs.Codex.Args
-	default:
-		return d.providerConfigs.Claude.Args
-	}
+	return d.providerConfigs[providerKey(provider)].Args
 }
 
 // drainToFile reads from r and writes to the named file.
@@ -326,7 +342,8 @@ var _ Dispatcher = (*ProcessDispatcher)(nil)
 // NOODLE_PROJECT_DIR points `noodle event emit` and other commands at the
 // main checkout's .noodle, where the loop reads session events.
 func (d *ProcessDispatcher) sessionEnv(req DispatchRequest, sessionID string) []string {
-	env := append(buildDispatchEnv(req), "NOODLE_SESSION_ID="+sessionID)
+	inherit := d.providerConfigs[providerKey(req.Provider)].InheritEnv
+	env := append(buildDispatchEnv(req, inherit), "NOODLE_SESSION_ID="+sessionID)
 	if d.projectDir != "" {
 		env = append(env, "NOODLE_PROJECT_DIR="+d.projectDir)
 	}

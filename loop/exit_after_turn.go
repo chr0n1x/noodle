@@ -8,14 +8,15 @@ import (
 )
 
 // holdsNoChangeExit reports whether a clean exit without commits must wait
-// for review. With exit_after_turn, a claude agent that ends its turn on a
-// question exits like a finished one; a stage_yield or a non-blocking
+// for review. With exit_after_turn on the stage's provider, an agent that
+// ends its turn on a question exits like a finished one; a stage_yield or a non-blocking
 // stage_message (the quality verdict) marks it as done.
 func (l *Loop) holdsNoChangeExit(cook *cookHandle) bool {
-	if !l.config.Agents.Claude.ExitAfterTurn {
-		return false
+	provider := strings.ToLower(strings.TrimSpace(cook.stage.Provider))
+	if provider == "" {
+		provider = "claude"
 	}
-	if provider := strings.TrimSpace(cook.stage.Provider); provider != "" && !strings.EqualFold(provider, "claude") {
+	if !l.config.Agents.For(provider).ExitAfterTurn {
 		return false
 	}
 	if m := l.readStageMessage(cook.session.ID()); m != nil && !m.IsBlocking() {

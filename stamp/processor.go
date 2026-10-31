@@ -14,7 +14,9 @@ import (
 
 // Processor stamps NDJSON lines and emits canonical sidecar events.
 type Processor struct {
-	Registry     *parse.Registry
+	Registry *parse.Registry
+	// Provider names the adapter for every line; empty detects per line.
+	Provider     string
 	Now          func() time.Time
 	MaxLineBytes int
 }
@@ -102,7 +104,7 @@ func (p *Processor) ProcessLine(line []byte) ([]byte, []parse.CanonicalEvent, er
 		return nil, nil, err
 	}
 
-	provider, events, err := p.Registry.ParseLine(stampedLine)
+	provider, events, err := p.Registry.ParseLineFor(p.Provider, stampedLine)
 	if err != nil {
 		return stampedLine, []parse.CanonicalEvent{{
 			Type:      parse.EventError,

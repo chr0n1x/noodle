@@ -1,0 +1,12 @@
+{"type":"session.tools_updated","data":{},"ephemeral":true,"_ts":"2026-10-30T12:00:00Z"}
+{"type":"user.message","data":{"content":"Read hello.txt, then reply with its contents only.","turnId":"0"},"_ts":"2026-10-30T12:00:01Z"}
+{"type":"assistant.turn_start","data":{"turnId":"0"},"_ts":"2026-10-30T12:00:01Z"}
+{"type":"assistant.tool_call_delta","data":{"toolCallId":"call_1","toolName":"view","inputDelta":"{\""},"ephemeral":true,"_ts":"2026-10-30T12:00:02Z"}
+{"type":"assistant.message","data":{"model":"gpt-6.1-sol","content":"","toolRequests":[{"toolCallId":"call_1","name":"view","arguments":{"path":"/tmp/noodle-fx/hello.txt"},"type":"function"}],"turnId":"0"},"_ts":"2026-10-30T12:00:03Z"}
+{"type":"tool.execution_start","data":{"toolCallId":"call_1","toolName":"view","arguments":{"path":"/tmp/noodle-fx/hello.txt"}},"_ts":"2026-10-30T12:00:03Z"}
+{"type":"tool.execution_complete","data":{"toolCallId":"call_1","success":true,"result":{"content":"noodle fixture\n"}},"_ts":"2026-10-30T12:00:03Z"}
+{"type":"assistant.turn_end","data":{"turnId":"0"},"_ts":"2026-10-30T12:00:03Z"}
+{"type":"assistant.message_delta","data":{"deltaContent":"noodle"},"ephemeral":true,"_ts":"2026-10-30T12:00:04Z"}
+{"type":"assistant.message","data":{"model":"gpt-6.1-sol","content":"noodle fixture","toolRequests":[],"turnId":"1"},"_ts":"2026-10-30T12:00:05Z"}
+{"type":"assistant.idle","data":{},"ephemeral":true,"_ts":"2026-10-30T12:00:05Z"}
+{"type":"result","timestamp":"2026-10-31T03:31:20.862Z","sessionId":"6d61c8ea-e1bf-4155-b878-8bbfd3dee00c","exitCode":0,"usage":{"premiumRequests":1,"totalApiDurationMs":5298,"sessionDurationMs":9033},"_ts":"2026-10-30T12:00:06Z"}

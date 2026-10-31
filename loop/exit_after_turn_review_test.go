@@ -114,3 +114,18 @@ func TestExitAfterTurnAdvancesNoChangeExitWithNonBlockingStageMessage(t *testing
 		t.Fatalf("a non-blocking stage_message marks the turn finished, but the stage parked: %q", pending.reason)
 	}
 }
+
+func TestExitAfterTurnUsesTheStageProvidersSetting(t *testing.T) {
+	l, cook := newExitAfterTurnLoop(t, false)
+	cook.stage.Provider = "maki"
+	l.config.Agents.Maki.ExitAfterTurn = true
+	if !l.holdsNoChangeExit(cook) {
+		t.Fatal("maki exit_after_turn should hold a no-change exit")
+	}
+
+	l, cook = newExitAfterTurnLoop(t, true)
+	cook.stage.Provider = "maki"
+	if l.holdsNoChangeExit(cook) {
+		t.Fatal("claude exit_after_turn should not apply to a maki stage")
+	}
+}

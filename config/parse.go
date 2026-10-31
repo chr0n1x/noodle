@@ -233,9 +233,11 @@ func normalizeParsedValues(config *Config, metadata toml.MetaData, diagnostics *
 			)
 		}
 		config.Routing.Defaults.Provider = defaultRoutingProvider
-	case "claude", "codex":
-		config.Routing.Defaults.Provider = provider
 	default:
+		if isKnownProvider(provider) {
+			config.Routing.Defaults.Provider = provider
+			break
+		}
 		appendNormalizedValueDiagnostic(diagnostics, "routing.defaults.provider",
 			fmt.Sprintf("provider %q unsupported; using %q", config.Routing.Defaults.Provider, defaultRoutingProvider),
 		)

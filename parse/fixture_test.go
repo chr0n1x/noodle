@@ -54,19 +54,17 @@ func TestDirectoryFixtures(t *testing.T) {
 	}
 }
 
+// adapterForFixture looks up the registry adapter named by the fixture's
+// leading segment, e.g. "codex-agent-message" uses the codex adapter.
 func adapterForFixture(t *testing.T, fixtureName string) LogAdapter {
 	t.Helper()
 
-	name := strings.ToLower(strings.TrimSpace(fixtureName))
-	switch {
-	case strings.HasPrefix(name, "claude"):
-		return ClaudeAdapter{}
-	case strings.HasPrefix(name, "codex"):
-		return CodexAdapter{}
-	default:
-		t.Fatalf("fixture %s must start with claude or codex", fixtureName)
-		return nil
+	provider, _, _ := strings.Cut(strings.ToLower(strings.TrimSpace(fixtureName)), "-")
+	adapter, ok := NewRegistry().AdapterForProvider(provider)
+	if !ok {
+		t.Fatalf("fixture %s names no registered provider", fixtureName)
 	}
+	return adapter
 }
 
 func parseCanonicalEvents(t *testing.T, lines []string) []CanonicalEvent {

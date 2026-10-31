@@ -46,6 +46,7 @@ type sessionBase struct {
 	streamDone     chan struct{}
 	streamDoneOnce sync.Once
 
+	provider     string
 	prompt       string
 	promptLogged bool
 	sink         SessionEventSink
@@ -62,6 +63,7 @@ type sessionBase struct {
 // sessionBaseConfig holds the common fields needed to initialize a sessionBase.
 type sessionBaseConfig struct {
 	id            string
+	provider      string
 	eventWriter   *event.EventWriter
 	stampedPath   string
 	canonicalPath string
@@ -72,6 +74,7 @@ type sessionBaseConfig struct {
 func newSessionBase(cfg sessionBaseConfig) sessionBase {
 	return sessionBase{
 		id:            cfg.id,
+		provider:      cfg.provider,
 		eventWriter:   cfg.eventWriter,
 		stampedPath:   cfg.stampedPath,
 		canonicalPath: cfg.canonicalPath,
@@ -312,6 +315,7 @@ func (s *sessionBase) processStream(ctx context.Context, stdout io.Reader, inter
 	defer canonicalFile.Close()
 
 	processor := stamp.NewProcessor()
+	processor.Provider = s.provider
 	if err := processor.Process(ctx, stdout, stampedFile, io.MultiWriter(canonicalFile, interceptor)); err != nil {
 		if ctx.Err() == nil {
 			s.publish(SessionEvent{Type: "warning", Message: "process stream: " + err.Error(), Timestamp: nowUTC()})

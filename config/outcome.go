@@ -39,7 +39,7 @@ func ParseStageAction(name string) (StageAction, bool) {
 // StageOutcomeConfig is one [stages.<task>] table: the action taken for each
 // state, and how the task's cooks run. An unset state keeps the loop's
 // mode-driven behavior: park for review in supervised mode, promote in auto
-// mode, fail the order on a failed cook. Harness (claude or codex) and Model
+// mode, fail the order on a failed cook. Harness (one of Providers) and Model
 // replace the scheduler's choice on stages that have not started. Provider is
 // codex's model_provider. SystemPrompt follows the skill in the cook's system
 // prompt, so it can override the skill's instructions.
@@ -147,13 +147,13 @@ func outcomeDiagnostics(config Config) []ConfigDiagnostic {
 func stageRoutingDiagnostics(task string, s StageOutcomeConfig) []ConfigDiagnostic {
 	var out []ConfigDiagnostic
 	harness := strings.ToLower(strings.TrimSpace(s.Harness))
-	if harness != "" && harness != "claude" && harness != "codex" {
+	if harness != "" && !isKnownProvider(harness) {
 		path := "stages." + task + ".harness"
 		out = append(out, ConfigDiagnostic{
 			FieldPath: path,
-			Message:   fmt.Sprintf("unknown harness %q (valid: claude, codex)", s.Harness),
+			Message:   fmt.Sprintf("unknown harness %q (valid: %s)", s.Harness, strings.Join(Providers, ", ")),
 			Severity:  DiagnosticSeverityFatal,
-			Fix:       "Set " + path + " to claude or codex, or remove it to keep the scheduler's choice.",
+			Fix:       "Set " + path + " to one of " + strings.Join(Providers, ", ") + ", or remove it to keep the scheduler's choice.",
 			Code:      DiagnosticCodeStageHarnessUnknown,
 		})
 	}

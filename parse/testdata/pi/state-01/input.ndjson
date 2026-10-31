@@ -1,0 +1,13 @@
+{"type":"session","version":3,"id":"01a19002-c20b-711c-8493-d1b53b40edca","timestamp":"2026-10-31T03:31:02.284Z","cwd":"/tmp/noodle-fx","_ts":"2026-10-30T12:00:00Z"}
+{"type":"agent_start","_ts":"2026-10-30T12:00:00Z"}
+{"type":"turn_start","_ts":"2026-10-30T12:00:00Z"}
+{"type":"message_end","message":{"role":"user","content":[{"type":"text","text":"Read hello.txt with the read tool, then reply with its contents only."}],"timestamp":1793417464600},"_ts":"2026-10-30T12:00:01Z"}
+{"type":"message_update","message":{"role":"assistant","content":[{"type":"text","text":"noo"}]},"_ts":"2026-10-30T12:00:01Z"}
+{"type":"message_end","message":{"role":"assistant","content":[{"type":"toolCall","id":"toolu_01","name":"read","arguments":{"path":"hello.txt"}}],"provider":"github-copilot","model":"claude-sonnet-5.5","usage":{"input":4,"output":49,"cacheRead":0,"cacheWrite":9402,"totalTokens":9455,"cost":{"total":0.024003}},"stopReason":"toolUse","timestamp":1793417464640},"_ts":"2026-10-30T12:00:02Z"}
+{"type":"tool_execution_start","toolCallId":"toolu_01","toolName":"read","args":{"path":"hello.txt"},"_ts":"2026-10-30T12:00:02Z"}
+{"type":"tool_execution_end","toolCallId":"toolu_01","toolName":"read","result":{"content":[{"type":"text","text":"noodle fixture\n"}]},"isError":false,"durationMs":1,"_ts":"2026-10-30T12:00:03Z"}
+{"type":"message_end","message":{"role":"toolResult","toolCallId":"toolu_01","toolName":"read","content":[{"type":"text","text":"noodle fixture\n"}],"isError":false},"_ts":"2026-10-30T12:00:03Z"}
+{"type":"turn_end","message":{"role":"assistant","content":[],"stopReason":"toolUse"},"_ts":"2026-10-30T12:00:03Z"}
+{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"noodle fixture"}],"provider":"github-copilot","model":"claude-sonnet-5.5","usage":{"input":2,"output":8,"cacheRead":9402,"cacheWrite":63,"totalTokens":9475,"cost":{"total":0.0011817}},"stopReason":"stop","timestamp":1793417465456},"_ts":"2026-10-30T12:00:04Z"}
+{"type":"agent_end","messages":[{"role":"user","content":[{"type":"text","text":"Read hello.txt"}]},{"role":"assistant","content":[{"type":"toolCall","id":"toolu_01","name":"read","arguments":{"path":"hello.txt"}}],"usage":{"input":4,"output":49,"cost":{"total":0.024003}},"stopReason":"toolUse"},{"role":"toolResult","toolCallId":"toolu_01","content":[{"type":"text","text":"noodle fixture\n"}]},{"role":"assistant","content":[{"type":"text","text":"noodle fixture"}],"usage":{"input":2,"output":8,"cost":{"total":0.0011817}},"stopReason":"stop"}],"_ts":"2026-10-30T12:00:05Z"}
+{"type":"agent_settled","aborted":false,"_ts":"2026-10-30T12:00:05Z"}

@@ -43,8 +43,12 @@ var claudeLineTypes = map[string]struct{}{
 func NewRegistry() *Registry {
 	return &Registry{
 		adapters: map[string]LogAdapter{
-			"claude": ClaudeAdapter{},
-			"codex":  CodexAdapter{},
+			"claude":  ClaudeAdapter{},
+			"codex":   CodexAdapter{},
+			"maki":    ClaudeAdapter{},
+			"pi":      PiAdapter{},
+			"pig":     PiAdapter{},
+			"copilot": CopilotAdapter{},
 		},
 	}
 }
@@ -63,9 +67,18 @@ func (r *Registry) AdapterForProvider(provider string) (LogAdapter, bool) {
 
 // ParseLine detects the provider and parses one line with that adapter.
 func (r *Registry) ParseLine(line []byte) (string, []CanonicalEvent, error) {
-	provider, err := DetectProvider(line)
-	if err != nil {
-		return "", nil, err
+	return r.ParseLineFor("", line)
+}
+
+// ParseLineFor parses one line with the named provider's adapter. An empty
+// provider is detected from the line's top-level "type".
+func (r *Registry) ParseLineFor(provider string, line []byte) (string, []CanonicalEvent, error) {
+	if provider == "" {
+		detected, err := DetectProvider(line)
+		if err != nil {
+			return "", nil, err
+		}
+		provider = detected
 	}
 
 	adapter, ok := r.AdapterForProvider(provider)

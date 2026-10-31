@@ -1,0 +1,4 @@
+{"type":"tool_execution_end","toolCallId":"t1","toolName":"bash","result":{"content":[{"type":"text","text":"exit code 1: go test failed"}]},"isError":true,"_ts":"2026-10-30T12:00:01Z"}
+{"type":"message_end","message":{"role":"assistant","content":[],"usage":{"input":1,"output":0,"cost":{"total":0}},"stopReason":"error","errorMessage":"429 rate limited"},"_ts":"2026-10-30T12:00:02Z"}
+{"type":"message_end","message":{"role":"assistant","content":[],"stopReason":"aborted"},"_ts":"2026-10-30T12:00:03Z"}
+{"type":"agent_settled","aborted":true,"_ts":"2026-10-30T12:00:04Z"}

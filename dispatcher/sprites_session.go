@@ -13,6 +13,7 @@ import (
 
 type spritesSessionConfig struct {
 	id            string
+	provider      string
 	sprite        spriteHandle
 	spriteName    string
 	cmd           *sprites.Cmd
@@ -43,6 +44,7 @@ func newSpritesSession(cfg spritesSessionConfig) *spritesSession {
 	return &spritesSession{
 		sessionBase: newSessionBase(sessionBaseConfig{
 			id:            cfg.id,
+			provider:      cfg.provider,
 			eventWriter:   cfg.eventWriter,
 			stampedPath:   cfg.stampedPath,
 			canonicalPath: cfg.canonicalPath,

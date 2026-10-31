@@ -59,11 +59,58 @@ type ProviderConfig struct {
 	// ExitAfterTurn closes a work agent's stdin when its turn finishes so
 	// the process exits and the stage completes.
 	ExitAfterTurn bool `toml:"exit_after_turn"`
+	// InheritEnv replaces [agents] inherit_env for this provider.
+	InheritEnv []string `toml:"inherit_env"`
 }
 
 type AgentsConfig struct {
-	Claude ProviderConfig `toml:"claude"`
-	Codex  ProviderConfig `toml:"codex"`
+	// InheritEnv lists the environment variables an agent inherits from
+	// noodle, beyond a base set such as PATH and HOME. A trailing "*" matches
+	// a prefix. Unset inherits everything.
+	InheritEnv []string `toml:"inherit_env"`
+
+	Claude  ProviderConfig `toml:"claude"`
+	Codex   ProviderConfig `toml:"codex"`
+	Pi      ProviderConfig `toml:"pi"`
+	Pig     ProviderConfig `toml:"pig"`
+	Maki    ProviderConfig `toml:"maki"`
+	Copilot ProviderConfig `toml:"copilot"`
+}
+
+// Providers lists every agent CLI noodle can run a cook with, in the order
+// help text names them.
+var Providers = []string{"claude", "codex", "pi", "pig", "maki", "copilot"}
+
+// For returns the [agents.<provider>] table; an unknown provider gets the
+// zero config.
+func (a AgentsConfig) For(provider string) ProviderConfig {
+	switch stringx.Normalize(provider) {
+	case "claude":
+		return a.Claude
+	case "codex":
+		return a.Codex
+	case "pi":
+		return a.Pi
+	case "pig":
+		return a.Pig
+	case "maki":
+		return a.Maki
+	case "copilot":
+		return a.Copilot
+	}
+	return ProviderConfig{}
+}
+
+// InheritEnvFor returns the inherit_env list for a provider: its own table's
+// list, else the [agents] list. ok is false when neither is set.
+func (a AgentsConfig) InheritEnvFor(provider string) (list []string, ok bool) {
+	if p := a.For(provider).InheritEnv; p != nil {
+		return p, true
+	}
+	if a.InheritEnv != nil {
+		return a.InheritEnv, true
+	}
+	return nil, false
 }
 
 // RuntimeConfig controls the default runtime for spawned cook sessions.

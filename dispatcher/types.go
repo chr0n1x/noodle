@@ -14,13 +14,13 @@ type ProviderConfig struct {
 	Path          string
 	Args          []string
 	ExitAfterTurn bool
+	// InheritEnv lists the variables the agent inherits beyond baseEnvKeys;
+	// nil inherits the whole environment.
+	InheritEnv []string
 }
 
-// ProviderConfigs holds per-provider configuration.
-type ProviderConfigs struct {
-	Claude ProviderConfig
-	Codex  ProviderConfig
-}
+// ProviderConfigs holds per-provider configuration keyed by provider name.
+type ProviderConfigs map[string]ProviderConfig
 
 // DispatchRequest defines one session launch.
 type DispatchRequest struct {

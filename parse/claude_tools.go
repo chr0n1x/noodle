@@ -61,6 +61,9 @@ func summarizeClaudeToolUse(name string, input json.RawMessage) string {
 	if filePath := extractStringField(input, "file_path"); filePath != "" {
 		return name + " " + filePath
 	}
+	if path := extractStringField(input, "path"); path != "" {
+		return name + " " + path
+	}
 	if pattern := extractStringField(input, "pattern"); pattern != "" {
 		return name + " " + pattern
 	}

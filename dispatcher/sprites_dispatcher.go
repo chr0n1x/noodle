@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	sprites "github.com/superfly/sprites-go"
 
@@ -110,6 +111,7 @@ func (d *SpritesDispatcher) Dispatch(ctx context.Context, req DispatchRequest) (
 
 	session := newSpritesSession(spritesSessionConfig{
 		id:            sessionID,
+		provider:      providerKey(req.Provider),
 		sprite:        sprite,
 		spriteName:    d.spriteName,
 		cmd:           cmd,
@@ -219,12 +221,7 @@ func (d *SpritesDispatcher) uploadPromptFile(ctx context.Context, sprite spriteH
 func (d *SpritesDispatcher) buildSpriteCommand(
 	ctx context.Context, sprite spriteHandle, req DispatchRequest, systemPrompt string,
 ) (*sprites.Cmd, io.ReadCloser, error) {
-	var agentArgs []string
-	if strings.EqualFold(strings.TrimSpace(req.Provider), "codex") {
-		agentArgs = buildSpriteCodexArgs(req)
-	} else {
-		agentArgs = buildSpriteClaudeArgs(req, systemPrompt)
-	}
+	agentArgs := spriteAgentArgs(req, systemPrompt)
 
 	quotedArgs := make([]string, len(agentArgs))
 	for i, arg := range agentArgs {
@@ -340,12 +337,33 @@ func uploadFileToSprite(ctx context.Context, sprite spriteHandle, localPath, rem
 	})
 }
 
-func buildSpriteCodexArgs(req DispatchRequest) []string {
-	return append([]string{"codex"}, codexBaseArgs(req)...)
+// spriteAgentArgs returns the agent command line, binary first. On a sprite
+// the prompt is piped to stdin and every provider runs one-shot.
+func spriteAgentArgs(req DispatchRequest, systemPrompt string) []string {
+	provider := providerKey(req.Provider)
+	var args []string
+	switch provider {
+	case "codex":
+		args = codexBaseArgs(req)
+	case "maki":
+		args = removeFlag(makiBaseArgs(req, systemPrompt), "--input-format", 1)
+	case "pi", "pig":
+		args = piBaseArgs(req, systemPrompt)
+	case "copilot":
+		args = copilotBaseArgs(req)
+	default:
+		args = claudeBaseArgs(req, systemPrompt)
+	}
+	return append([]string{provider}, args...)
 }
 
-func buildSpriteClaudeArgs(req DispatchRequest, systemPrompt string) []string {
-	return append([]string{"claude"}, claudeBaseArgs(req, systemPrompt)...)
+// removeFlag drops flag and the n values that follow it.
+func removeFlag(args []string, flag string, n int) []string {
+	i := slices.Index(args, flag)
+	if i < 0 {
+		return args
+	}
+	return slices.Delete(slices.Clone(args), i, min(i+1+n, len(args)))
 }
 
 // gitRemoteURL reads the origin remote URL from a git repo.

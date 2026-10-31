@@ -1,0 +1,3 @@
+{"type":"session","version":3,"id":"pig-sess-1","cwd":"/tmp/noodle-fx","_ts":"2026-10-30T12:00:00Z"}
+{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"noodle fixture"}],"usage":{"input":3,"output":5,"cost":{"total":0.002}},"stopReason":"stop"},"_ts":"2026-10-30T12:00:01Z"}
+{"type":"agent_end","messages":[{"role":"assistant","content":[{"type":"text","text":"noodle fixture"}],"usage":{"input":3,"output":5,"cost":{"total":0.002}},"stopReason":"stop"}],"_ts":"2026-10-30T12:00:02Z"}

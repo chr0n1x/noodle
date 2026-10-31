@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -38,6 +39,58 @@ func claudeBaseArgs(req DispatchRequest, systemPrompt string) []string {
 	}
 	if strings.TrimSpace(systemPrompt) != "" {
 		args = append(args, "--append-system-prompt", systemPrompt)
+	}
+	return args
+}
+
+// makiBaseArgs returns the maki CLI flags for a dispatch request. maki reads
+// and writes Claude-format stream-json, so the session is steered through a
+// claudeController like Claude's.
+func makiBaseArgs(req DispatchRequest, systemPrompt string) []string {
+	args := []string{
+		"-p",
+		"--input-format", "stream-json",
+		"--output-format", "stream-json",
+		"--verbose",
+		"--yolo",
+	}
+	if req.MaxTurns > 0 {
+		args = append(args, "--max-turns", strconv.Itoa(req.MaxTurns))
+	}
+	if strings.TrimSpace(req.Model) != "" {
+		args = append(args, "--model", req.Model)
+	}
+	if strings.TrimSpace(systemPrompt) != "" {
+		args = append(args, "--append-system-prompt", systemPrompt)
+	}
+	return args
+}
+
+// piBaseArgs returns the pi CLI flags for a dispatch request; pig takes the
+// same flags. The prompt is piped to stdin and the session runs one-shot.
+func piBaseArgs(req DispatchRequest, systemPrompt string) []string {
+	args := []string{"-p", "--mode", "json"}
+	if strings.TrimSpace(req.Model) != "" {
+		args = append(args, "--model", req.Model)
+	}
+	if strings.TrimSpace(req.ReasoningLevel) != "" {
+		args = append(args, "--thinking", req.ReasoningLevel)
+	}
+	if strings.TrimSpace(systemPrompt) != "" {
+		args = append(args, "--append-system-prompt", systemPrompt)
+	}
+	return args
+}
+
+// copilotBaseArgs returns the GitHub Copilot CLI flags for a dispatch
+// request. The prompt is piped to stdin and the session runs one-shot.
+func copilotBaseArgs(req DispatchRequest) []string {
+	args := []string{"--output-format", "json", "--yolo", "--no-color"}
+	if strings.TrimSpace(req.Model) != "" {
+		args = append(args, "--model", req.Model)
+	}
+	if strings.TrimSpace(req.ReasoningLevel) != "" {
+		args = append(args, "--reasoning-effort", req.ReasoningLevel)
 	}
 	return args
 }
@@ -93,9 +146,43 @@ func resolveTemplateVars(tmpl string, vars map[string]string) string {
 	return result
 }
 
-func buildDispatchEnv(req DispatchRequest) []string {
-	env := make([]string, 0, len(os.Environ())+len(req.EnvVars)+4)
-	for _, entry := range os.Environ() {
+// baseEnvKeys are inherited even when an inherit_env list is set, so the
+// agent can still find binaries, its home directory and a temp directory.
+var baseEnvKeys = []string{
+	"PATH", "HOME", "USER", "LOGNAME", "SHELL", "TERM", "TMPDIR", "LANG", "LC_*",
+	"SYSTEMROOT", "COMSPEC", "PATHEXT", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP",
+}
+
+// filterEnv keeps the entries whose key is in baseEnvKeys or allow. Keys
+// match case-insensitively and a trailing "*" matches a prefix. A nil allow
+// list keeps every entry.
+func filterEnv(environ, allow []string) []string {
+	if allow == nil {
+		return environ
+	}
+	patterns := append(slices.Clone(baseEnvKeys), allow...)
+	out := make([]string, 0, len(environ))
+	for _, entry := range environ {
+		key, _, _ := strings.Cut(entry, "=")
+		for _, pattern := range patterns {
+			if prefix, ok := strings.CutSuffix(pattern, "*"); ok {
+				if len(key) >= len(prefix) && strings.EqualFold(key[:len(prefix)], prefix) {
+					out = append(out, entry)
+					break
+				}
+			} else if strings.EqualFold(key, pattern) {
+				out = append(out, entry)
+				break
+			}
+		}
+	}
+	return out
+}
+
+func buildDispatchEnv(req DispatchRequest, inheritEnv []string) []string {
+	environ := filterEnv(os.Environ(), inheritEnv)
+	env := make([]string, 0, len(environ)+len(req.EnvVars)+4)
+	for _, entry := range environ {
 		key, _, _ := strings.Cut(entry, "=")
 		if strings.EqualFold(key, "CLAUDECODE") {
 			continue
@@ -119,10 +206,27 @@ func buildDispatchEnv(req DispatchRequest) []string {
 	return env
 }
 
+// InlinesSkill reports whether the dispatcher puts a provider's skill in the
+// system prompt instead of leaving the agent to load it with a Skill tool.
+func InlinesSkill(provider string) bool {
+	switch stringx.Normalize(provider) {
+	case "claude", "maki", "pi", "pig", "copilot":
+		return true
+	}
+	return false
+}
+
 func composePrompts(provider, requestPrompt, preamble, skillSystemPrompt, stageSystemPrompt string) (systemPrompt, finalPrompt string) {
 	finalPrompt = requestPrompt
 	fullSystemPrompt := stringx.JoinNonEmpty("\n\n", preamble, skillSystemPrompt, stageSystemPrompt)
-	if strings.EqualFold(provider, "claude") {
+	if strings.EqualFold(provider, "copilot") {
+		// copilot has no system prompt flag; the whole prompt goes on stdin.
+		if fullSystemPrompt != "" {
+			finalPrompt = requestPrompt + "\n\n---\n\n" + fullSystemPrompt
+		}
+		return "", finalPrompt
+	}
+	if InlinesSkill(provider) {
 		systemPrompt = fullSystemPrompt
 		return systemPrompt, finalPrompt
 	}

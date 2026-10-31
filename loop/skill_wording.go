@@ -3,16 +3,18 @@ package loop
 import (
 	"fmt"
 	"strings"
+
+	"github.com/poteto/noodle/dispatcher"
 )
 
 // skillWordingForProvider rewrites a prompt's "Use Skill(<skill>)" lines for
 // providers whose dispatcher inlines the skill into the system prompt
-// (claude). Those agents cannot load .agents/skills through the Skill tool,
+// (see dispatcher.InlinesSkill). Those agents cannot load .agents/skills through the Skill tool,
 // and calling it can load a different skill of the same name from the user's
 // own Claude Code setup.
 func skillWordingForProvider(prompt, provider, skill string) string {
 	skill = strings.TrimSpace(skill)
-	if skill == "" || !strings.EqualFold(strings.TrimSpace(provider), "claude") {
+	if skill == "" || !dispatcher.InlinesSkill(provider) {
 		return prompt
 	}
 	prompt = strings.Replace(prompt,

@@ -156,7 +156,7 @@ func TestValidateRejectsStageRouting(t *testing.T) {
 	cases := []struct {
 		name, toml, code, path string
 	}{
-		{"unknown harness", "[stages.review]\nharness = \"pi\"\n", DiagnosticCodeStageHarnessUnknown, "stages.review.harness"},
+		{"unknown harness", "[stages.review]\nharness = \"gemini\"\n", DiagnosticCodeStageHarnessUnknown, "stages.review.harness"},
 		{"provider with claude", "[stages.review]\nharness = \"claude\"\nprovider = \"bedrock\"\n", DiagnosticCodeStageProviderUnsupported, "stages.review.provider"},
 		{"provider without harness", "[stages.review]\nprovider = \"openai\"\n", DiagnosticCodeStageProviderUnsupported, "stages.review.provider"},
 	}

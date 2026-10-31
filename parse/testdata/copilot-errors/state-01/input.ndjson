@@ -1,0 +1,5 @@
+{"type":"assistant.message","data":{"content":"","toolRequests":[{"toolCallId":"call_2","name":"bash","arguments":{"command":"ls /nonexistent-noodle-dir","description":"Run requested ls command once"}}]},"_ts":"2026-10-30T12:00:01Z"}
+{"type":"tool.execution_complete","data":{"toolCallId":"call_2","success":true,"result":{"content":"ls: /nonexistent-noodle-dir: No such file or directory\n<shellId: 0 completed with exit code 1>"}},"_ts":"2026-10-30T12:00:02Z"}
+{"type":"tool.execution_complete","data":{"toolCallId":"call_3","success":true,"result":{"content":"ok\n<shellId: 1 completed with exit code 0>"}},"_ts":"2026-10-30T12:00:03Z"}
+{"type":"tool.execution_complete","data":{"toolCallId":"call_4","success":false,"error":{"message":"Path not allowed"}},"_ts":"2026-10-30T12:00:04Z"}
+{"type":"result","exitCode":1,"usage":{"premiumRequests":1},"_ts":"2026-10-30T12:00:05Z"}

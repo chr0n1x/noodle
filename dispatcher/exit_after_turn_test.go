@@ -16,7 +16,7 @@ func TestCloseStdinAfterTurn(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			d := NewProcessDispatcher(ProcessDispatcherConfig{
-				ProviderConfigs: ProviderConfigs{Claude: ProviderConfig{ExitAfterTurn: tc.exitAfterTurn}},
+				ProviderConfigs: ProviderConfigs{"claude": {ExitAfterTurn: tc.exitAfterTurn}},
 			})
 			got := d.closeStdinAfterTurn(DispatchRequest{KeepAlive: tc.keepAlive})
 			if got != tc.want {

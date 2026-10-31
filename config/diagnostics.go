@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/poteto/noodle/internal/filex"
@@ -29,9 +30,9 @@ func Validate(config Config) ValidationResult {
 	} else if !isKnownProvider(config.Routing.Defaults.Provider) {
 		result.Diagnostics = append(result.Diagnostics, ConfigDiagnostic{
 			FieldPath: "routing.defaults.provider",
-			Message:   fmt.Sprintf("unknown provider %q (valid: claude, codex)", config.Routing.Defaults.Provider),
+			Message:   fmt.Sprintf("unknown provider %q (valid: %s)", config.Routing.Defaults.Provider, strings.Join(Providers, ", ")),
 			Severity:  DiagnosticSeverityFatal,
-			Fix:       "Set routing.defaults.provider to \"claude\" or \"codex\" in .noodle.toml.",
+			Fix:       "Set routing.defaults.provider to one of " + strings.Join(Providers, ", ") + " in .noodle.toml.",
 			Code:      DiagnosticCodeProviderUnknown,
 		})
 	}
@@ -73,8 +74,9 @@ func Validate(config Config) ValidationResult {
 			},
 		})
 	}
-	appendAgentDirDiagnostic("agents.claude.path", config.Agents.Claude.Path)
-	appendAgentDirDiagnostic("agents.codex.path", config.Agents.Codex.Path)
+	for _, p := range Providers {
+		appendAgentDirDiagnostic("agents."+p+".path", config.Agents.For(p).Path)
+	}
 
 	if _, hasBacklog := config.Adapters["backlog"]; !hasBacklog {
 		result.Diagnostics = append(result.Diagnostics, ConfigDiagnostic{
@@ -158,9 +160,5 @@ func commandLooksPath(token string) bool {
 }
 
 func isKnownProvider(provider string) bool {
-	switch stringx.Normalize(provider) {
-	case "claude", "codex":
-		return true
-	}
-	return false
+	return slices.Contains(Providers, stringx.Normalize(provider))
 }

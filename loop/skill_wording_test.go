@@ -81,3 +81,26 @@ func TestSkillWordingRewritesAnySkillToolLine(t *testing.T) {
 		t.Fatalf("got %q\nwant %q", got, want)
 	}
 }
+
+func TestMakiCookPromptPointsAtInlinedSkill(t *testing.T) {
+	got := skillWordingForProvider("Use Skill(execute) for methodology.", "maki", "execute")
+	if !strings.HasPrefix(got, "Follow the execute skill in your system prompt") {
+		t.Fatalf("maki prompt still asks for the Skill tool: %q", got)
+	}
+}
+
+func TestPiCookPromptPointsAtInlinedSkill(t *testing.T) {
+	for _, provider := range []string{"pi", "pig"} {
+		got := skillWordingForProvider("Use Skill(execute) for methodology.", provider, "execute")
+		if !strings.HasPrefix(got, "Follow the execute skill in your system prompt") {
+			t.Fatalf("%s prompt still asks for the Skill tool: %q", provider, got)
+		}
+	}
+}
+
+func TestCopilotCookPromptPointsAtInlinedSkill(t *testing.T) {
+	got := skillWordingForProvider("Use Skill(execute) for methodology.", "copilot", "execute")
+	if !strings.HasPrefix(got, "Follow the execute skill") {
+		t.Fatalf("copilot prompt still asks for the Skill tool: %q", got)
+	}
+}

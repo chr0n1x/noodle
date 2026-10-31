@@ -39,7 +39,7 @@ Controls which Agent provider and model are used for skill execution.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `provider` | string | `"claude"` | Agent provider name (e.g. `"claude"`, `"codex"`) |
+| `provider` | string | `"claude"` | Agent provider name: `claude`, `codex`, `pi`, `pig`, `maki` or `copilot` |
 | `model` | string | `"claude-opus-4-6"` | Model identifier passed to the provider |
 
 ```toml
@@ -84,33 +84,48 @@ Each agent consumes tokens independently. `max_concurrency = 4` means up to four
 
 ### `[agents]`
 
-Configures paths and arguments for agent CLI binaries. Each sub-table names a provider.
-
-#### `[agents.claude]`
+Configures the agent CLIs. Each sub-table names a provider: `claude`, `codex`, `pi`, `pig`, `maki` or `copilot`.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `path` | string | `""` | Path to the Claude CLI binary or directory |
+| `inherit_env` | string[] | unset | Environment variables every agent inherits from noodle. Unset inherits the whole environment |
+
+#### `[agents.<provider>]`
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `path` | string | `""` | Directory holding the CLI binary. Unset runs the binary found on `PATH` |
 | `args` | string[] | `[]` | Additional CLI arguments passed on every invocation |
+| `exit_after_turn` | bool | `false` | Close the agent's stdin when its turn ends, so it exits and the stage completes. Only `claude` and `maki` keep stdin open |
+| `inherit_env` | string[] | unset | Replaces `[agents] inherit_env` for this provider |
+
+With `inherit_env` set, an agent gets only the listed variables plus a base set: `PATH`, `HOME`, `USER`, `LOGNAME`, `SHELL`, `TERM`, `TMPDIR`, `LANG`, `LC_*`, and on Windows `SYSTEMROOT`, `COMSPEC`, `PATHEXT`, `USERPROFILE`, `APPDATA`, `LOCALAPPDATA`, `TEMP`, `TMP`. Names match case-insensitively, and a trailing `*` matches a prefix. `NOODLE_*` variables and the order's env vars are always set. An empty list (`[]`) keeps only the base set.
 
 ```toml
+[agents]
+inherit_env = ["GITHUB_TOKEN", "AWS_*"]
+
 [agents.claude]
-path = "~/.claude"
-args = ["--dangerously-skip-permissions", "--verbose"]
+path = "~/.claude/local"
+args = ["--verbose"]
+
+# copilot fails to authenticate when GITHUB_TOKEN is set to a token
+# without Copilot access, so drop it for copilot only.
+[agents.copilot]
+inherit_env = ["AWS_*"]
 ```
 
-#### `[agents.codex]`
+How each provider runs:
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `path` | string | `""` | Path to the Codex CLI binary or directory |
-| `args` | string[] | `[]` | Additional CLI arguments passed on every invocation |
+| Provider | Command | Prompt | Skill | Steering |
+|----------|---------|--------|-------|----------|
+| `claude` | `claude --input-format stream-json --output-format stream-json` | stream-json on stdin | system prompt | yes |
+| `maki` | `maki -p --input-format stream-json --output-format stream-json --yolo` | stream-json on stdin | system prompt | yes |
+| `codex` | `codex exec --json` | stdin, then closed | loaded by codex | no |
+| `pi`, `pig` | `pi -p --mode json` | stdin, then closed | system prompt | no |
+| `copilot` | `copilot --output-format json --yolo` | stdin, then closed | appended to the prompt | no |
 
-```toml
-[agents.codex]
-path = "~/.codex"
-args = ["--full-auto"]
-```
+pi, pig and maki report cost per session. copilot reports premium requests rather than cost, so its sessions show no cost.
 
 ---
 
@@ -216,10 +231,10 @@ The same table sets how the task's cooks run:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `harness` | string | scheduler's choice | Agent CLI for the cook: `claude` or `codex` |
+| `harness` | string | scheduler's choice | Agent CLI for the cook: `claude`, `codex`, `pi`, `pig`, `maki` or `copilot` |
 | `model` | string | scheduler's choice | Model for the cook |
 | `provider` | string | unset | Codex's `model_provider`, passed as `-c model_provider="<provider>"`. Needs `harness = "codex"`; the claude CLI takes its backend from the environment |
-| `system_prompt` | string | unset | Text placed after the skill in the cook's system prompt, so it can override what the skill says. With codex it is appended to the prompt |
+| `system_prompt` | string | unset | Text placed after the skill in the cook's system prompt, so it can override what the skill says. With codex and copilot it is appended to the prompt |
 
 `harness` and `model` are set on every stage of the task that has not started, when orders are promoted and again when the cook starts. A stage already running keeps its model. An unknown harness, or `provider` without `harness = "codex"`, stops the loop at startup.
 

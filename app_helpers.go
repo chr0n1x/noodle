@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/poteto/noodle/dispatcher"
+	"github.com/poteto/noodle/loop"
 	"github.com/poteto/noodle/skill"
 )
 
@@ -47,15 +48,5 @@ func (a *App) ProviderConfigs() dispatcher.ProviderConfigs {
 	if a == nil {
 		return dispatcher.ProviderConfigs{}
 	}
-	return dispatcher.ProviderConfigs{
-		Claude: dispatcher.ProviderConfig{
-			Path:          a.Config.Agents.Claude.Path,
-			Args:          a.Config.Agents.Claude.Args,
-			ExitAfterTurn: a.Config.Agents.Claude.ExitAfterTurn,
-		},
-		Codex: dispatcher.ProviderConfig{
-			Path: a.Config.Agents.Codex.Path,
-			Args: a.Config.Agents.Codex.Args,
-		},
-	}
+	return loop.ProviderConfigsFrom(a.Config.Agents)
 }

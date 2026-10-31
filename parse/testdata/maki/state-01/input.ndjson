@@ -1,0 +1,5 @@
+{"type":"system","subtype":"init","cwd":"/tmp/noodle-fx","session_id":"maki-sess-1","tools":["read","bash"],"model":"claude-opus-5.5","_ts":"2026-10-30T12:00:00Z"}
+{"type":"assistant","message":{"model":"claude-opus-5.5","role":"assistant","content":[{"type":"tool_use","id":"toolu_01","name":"read","input":{"path":"/tmp/noodle-fx/hello.txt","offset":1,"limit":0}}],"usage":{"input_tokens":4,"output_tokens":107}},"session_id":"maki-sess-1","_ts":"2026-10-30T12:00:01Z"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_01","content":"1: noodle fixture"}]},"session_id":"maki-sess-1","_ts":"2026-10-30T12:00:02Z"}
+{"type":"assistant","message":{"model":"claude-opus-5.5","role":"assistant","content":[{"type":"text","text":"noodle fixture"}],"usage":{"input_tokens":2,"output_tokens":8}},"session_id":"maki-sess-1","_ts":"2026-10-30T12:00:03Z"}
+{"type":"result","subtype":"success","is_error":false,"duration_ms":2370,"num_turns":2,"result":"noodle fixture","stop_reason":"end_turn","session_id":"maki-sess-1","total_cost_usd":0.0821508,"usage":{"input_tokens":6,"output_tokens":115},"_ts":"2026-10-30T12:00:04Z"}

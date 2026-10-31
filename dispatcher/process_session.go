@@ -19,6 +19,7 @@ type processSession struct {
 
 type processSessionConfig struct {
 	id            string
+	provider      string
 	process       *ProcessHandle
 	eventWriter   *event.EventWriter
 	canonicalPath string
@@ -33,6 +34,7 @@ func newProcessSession(cfg processSessionConfig) *processSession {
 	return &processSession{
 		sessionBase: newSessionBase(sessionBaseConfig{
 			id:            cfg.id,
+			provider:      cfg.provider,
 			eventWriter:   cfg.eventWriter,
 			stampedPath:   cfg.stampedPath,
 			canonicalPath: cfg.canonicalPath,
