@@ -3,6 +3,7 @@ import { useActiveChannel, useSuspenseSnapshot, useWSStatus, formatCost } from "
 import type { ChannelId, StageStatus } from "~/client";
 import { Badge } from "./Badge";
 import { PublishButton } from "./PublishButton";
+import { LoopControlButton } from "./LoopControlButton";
 import { DraftPRLink } from "./DraftPRLink";
 import { OrderSourceLink } from "./order-link";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
@@ -209,6 +210,9 @@ export function Sidebar() {
             </div>
             <div className={`status-dot ${wsStatus === "connected" ? "active" : "idle"}`} />
           </button>
+        </li>
+        <li>
+          <LoopControlButton loopState={snapshot.loop_state} />
         </li>
       </ul>
 

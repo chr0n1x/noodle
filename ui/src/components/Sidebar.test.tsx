@@ -64,6 +64,14 @@ describe("Sidebar", () => {
     expect(screen.getByText("Scheduler")).toBeInTheDocument();
   });
 
+  it("shows the loop pause control right below the scheduler", () => {
+    mockSnapshot = buildSnapshot({ loop_state: "paused" });
+    render(<Sidebar />);
+    const scheduler = screen.getByText("Scheduler").closest("li");
+    const control = screen.getByRole("button", { name: "Resume loop" });
+    expect(scheduler?.nextElementSibling).toContainElement(control);
+  });
+
   it("renders orders from snapshot", () => {
     mockSnapshot = buildSnapshot({
       orders: [
