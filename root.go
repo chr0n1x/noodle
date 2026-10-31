@@ -77,6 +77,9 @@ func NewRootCmd() *cobra.Command {
 		newResetCmd(&app),
 		newReviewCmd(&app),
 		newOrderCmd(&app),
+		newLoopControlCmd(&app, "pause"),
+		newLoopControlCmd(&app, "resume"),
+		newLoopControlCmd(&app, "drain"),
 	)
 
 	return root
